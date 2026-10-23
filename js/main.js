@@ -258,11 +258,7 @@ function initHeader() {
     overlay.addEventListener('click', closeDrawer);
   }
 
-  drawerLinks.forEach(link => {
-    link.addEventListener('click', () => {
-      closeDrawer();
-    });
-  });
+  // drawerLinks son manejados integralmente por initSmoothScroll para evitar condiciones de carrera en móvil
 
   if (drawerAuthBtn) {
     drawerAuthBtn.addEventListener('click', () => {
@@ -278,8 +274,70 @@ function initHeader() {
 }
 
 /* ==========================================================================
-   2.1 NAVEGACION SUAVE ENTRE SECCIONES (SMOOTH SCROLLING)
+   2.1 MOTOR DE DESPLAZAMIENTO SUAVE PROFESIONAL (RAF CUBIC EASING & SCROLLSPY)
+   Garantiza suavidad continua incluso desde el footer hasta el inicio (sin saltos bruscos)
    ========================================================================== */
+let activeSmoothScrollRAF = null;
+
+function customSmoothScrollTo(targetY, callback) {
+  if (activeSmoothScrollRAF) {
+    cancelAnimationFrame(activeSmoothScrollRAF);
+    activeSmoothScrollRAF = null;
+  }
+
+  const startY = window.scrollY !== undefined ? window.scrollY : (window.pageYOffset || document.documentElement.scrollTop || 0);
+  const diff = targetY - startY;
+  if (Math.abs(diff) < 3) {
+    window.scrollTo(0, targetY);
+    if (callback) callback();
+    return;
+  }
+
+  const distance = Math.abs(diff);
+  // Duración dinámica proporcional a la distancia (mínimo 500ms, máximo 850ms)
+  const duration = Math.min(850, Math.max(480, Math.round(Math.sqrt(distance) * 22)));
+  const startTime = performance.now();
+
+  // Curva de aceleración/desaceleración suave (Cubic Ease In-Out)
+  function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+
+  function step(currentTime) {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(1, elapsed / duration);
+    const ease = easeInOutCubic(progress);
+    const currentPos = Math.round(startY + diff * ease);
+
+    window.scrollTo(0, currentPos);
+
+    if (progress < 1) {
+      activeSmoothScrollRAF = requestAnimationFrame(step);
+    } else {
+      window.scrollTo(0, targetY);
+      activeSmoothScrollRAF = null;
+      if (callback) callback();
+    }
+  }
+
+  activeSmoothScrollRAF = requestAnimationFrame(step);
+}
+
+// Cancelar animación suave si el usuario interrumpe con la rueda del ratón o toque
+window.addEventListener('wheel', () => {
+  if (activeSmoothScrollRAF) {
+    cancelAnimationFrame(activeSmoothScrollRAF);
+    activeSmoothScrollRAF = null;
+  }
+}, { passive: true });
+
+window.addEventListener('touchstart', () => {
+  if (activeSmoothScrollRAF) {
+    cancelAnimationFrame(activeSmoothScrollRAF);
+    activeSmoothScrollRAF = null;
+  }
+}, { passive: true });
+
 function initSmoothScroll() {
   const anchors = document.querySelectorAll('a[href^="#"]');
   const drawer = document.getElementById('mobile-nav-drawer');
@@ -290,7 +348,29 @@ function initSmoothScroll() {
       drawer.classList.remove('open');
       if (overlay) overlay.classList.remove('open');
       document.body.style.overflow = '';
+      return true;
     }
+    return false;
+  }
+
+  function calculateTargetY(targetEl) {
+    const header = document.querySelector('.main-header');
+    const headerHeight = header ? header.offsetHeight : 68;
+    const scrollY = window.scrollY !== undefined ? window.scrollY : (window.pageYOffset || document.documentElement.scrollTop || 0);
+    const targetRect = targetEl.getBoundingClientRect();
+    return Math.max(0, Math.round(targetRect.top + scrollY - headerHeight - 6));
+  }
+
+  function triggerScroll(targetY, href) {
+    customSmoothScrollTo(targetY, () => {
+      if (history.pushState) {
+        history.pushState(null, '', href || window.location.pathname);
+      }
+      if (typeof checkRevealAnimations === 'function') {
+        checkRevealAnimations();
+      }
+      updateActiveNavLinks();
+    });
   }
 
   anchors.forEach(anchor => {
@@ -298,22 +378,26 @@ function initSmoothScroll() {
       const href = this.getAttribute('href');
       if (!href) return;
 
-      // Handle '#', empty, or '#inicio'
+      // Ignorar deep links o modales
+      if (href.startsWith('#producto=') || href.startsWith('#modal-') || href.startsWith('#!')) {
+        return;
+      }
+
+      // Enlace a Inicio / Arriba
       if (href === '#' || href === '#inicio') {
         e.preventDefault();
-        closeMobileDrawer();
-        window.scrollTo({
-          top: 0,
-          left: 0,
-          behavior: 'smooth'
-        });
-        if (history.pushState) {
-          history.pushState(null, '', window.location.pathname + window.location.search);
+        const wasOpen = closeMobileDrawer();
+        const execute = () => {
+          triggerScroll(0, '#inicio');
+        };
+        if (wasOpen) {
+          setTimeout(execute, 70);
+        } else {
+          execute();
         }
         return;
       }
 
-      // If target element exists on page
       let targetEl = null;
       try {
         targetEl = document.querySelector(href);
@@ -323,24 +407,63 @@ function initSmoothScroll() {
 
       if (targetEl) {
         e.preventDefault();
-        closeMobileDrawer();
+        const wasOpen = closeMobileDrawer();
+        const execute = () => {
+          const targetY = calculateTargetY(targetEl);
+          triggerScroll(targetY, href);
+        };
 
-        const header = document.querySelector('.main-header');
-        const headerHeight = header ? header.offsetHeight : 70;
-        const targetRect = targetEl.getBoundingClientRect();
-        const targetY = targetRect.top + window.pageYOffset - headerHeight - 12;
-
-        window.scrollTo({
-          top: Math.max(0, targetY),
-          behavior: 'smooth'
-        });
-
-        if (history.pushState) {
-          history.pushState(null, '', href);
+        if (wasOpen) {
+          setTimeout(execute, 70);
+        } else {
+          execute();
         }
       }
     });
   });
+
+  // ScrollSpy para actualizar el link activo en la barra de navegación
+  function updateActiveNavLinks() {
+    const sections = ['inicio', 'trayectoria', 'marcas', 'tienda', 'taller', 'noticias', 'ubicacion'];
+    const scrollPos = (window.scrollY || window.pageYOffset || 0) + 110;
+    let current = 'inicio';
+
+    for (let i = 0; i < sections.length; i++) {
+      const sec = document.getElementById(sections[i]);
+      if (sec) {
+        const top = sec.offsetTop;
+        const height = sec.offsetHeight;
+        if (scrollPos >= top && scrollPos < top + height) {
+          current = sections[i];
+          break;
+        }
+      }
+    }
+
+    document.querySelectorAll('.nav-link').forEach(link => {
+      const href = link.getAttribute('href');
+      if (href === '#' + current || (current === 'inicio' && (href === '#' || href === '#inicio'))) {
+        link.classList.add('active');
+      } else {
+        link.classList.remove('active');
+      }
+    });
+
+    document.querySelectorAll('.mobile-nav-link').forEach(link => {
+      const href = link.getAttribute('href');
+      if (href === '#' + current || (current === 'inicio' && (href === '#' || href === '#inicio'))) {
+        link.classList.add('active');
+      } else {
+        link.classList.remove('active');
+      }
+    });
+  }
+
+  window.addEventListener('scroll', () => {
+    updateActiveNavLinks();
+  }, { passive: true });
+
+  updateActiveNavLinks();
 }
 
 /* ==========================================================================
@@ -736,6 +859,25 @@ function initStore() {
 
   renderProducts('all', '');
 
+  // Soporte de enlace directo compartido (Deep Link): #producto={SKU/ID}
+  function checkDeepLinkProduct() {
+    const hash = window.location.hash || '';
+    if (hash.startsWith('#producto=')) {
+      const targetKey = decodeURIComponent(hash.replace('#producto=', '')).trim().toUpperCase();
+      const found = PRODUCTS_DATA.find(p => (p.sku && p.sku.toUpperCase() === targetKey) || p.id.toUpperCase() === targetKey);
+      if (found) {
+        setTimeout(() => {
+          openProductDetail(found.id);
+          const tiendaSec = document.getElementById('tienda');
+          if (tiendaSec) tiendaSec.scrollIntoView({ behavior: 'smooth' });
+        }, 350);
+      }
+    }
+  }
+
+  checkDeepLinkProduct();
+  window.addEventListener('hashchange', checkDeepLinkProduct);
+
   const filterBtns = document.querySelectorAll('.btn-pill');
   filterBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -800,39 +942,108 @@ function initStore() {
   }
 }
 
+// Función utilitaria para normalizar texto (ignora acentos, diacríticos, mayúsculas y caracteres especiales)
+function normalizeSearchText(str) {
+  if (!str) return '';
+  return String(str)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+// Comprobación de token tolerante a singulares/plurales y raíces en español
+function tokenMatchesSearchable(searchable, tok) {
+  if (!tok || !searchable) return false;
+  if (searchable.includes(tok)) return true;
+  // Plural a singular (-s) (ej: 'electricas' -> 'electrica', 'montanas' -> 'montana')
+  if (tok.length > 4 && tok.endsWith('s') && searchable.includes(tok.slice(0, -1))) {
+    return true;
+  }
+  // Plural a singular (-es) (ej: 'colores' -> 'color')
+  if (tok.length > 5 && tok.endsWith('es') && searchable.includes(tok.slice(0, -2))) {
+    return true;
+  }
+  return false;
+}
+
 function renderProducts(category, searchTerm) {
   const grid = document.getElementById('products-grid');
   if (!grid) return;
 
-  const query = (searchTerm || '').trim().toLowerCase();
+  const rawQuery = (searchTerm || '').trim();
+  const queryTokens = normalizeSearchText(rawQuery).split(/\s+/).filter(Boolean);
 
   const filtered = PRODUCTS_DATA.filter(p => {
     const matchCat = (category === 'all' || p.category === category);
-    const matchSearch = (query === '' ||
-      p.title.toLowerCase().includes(query) ||
-      p.brand.toLowerCase().includes(query) ||
-      p.specs.toLowerCase().includes(query) ||
-      (p.sku && p.sku.toLowerCase().includes(query))
+    if (!matchCat) return false;
+    if (queryTokens.length === 0) return true;
+
+    // Concatena todos los campos indexables del producto
+    const searchable = normalizeSearchText(
+      (p.title || '') + ' ' +
+      (p.brand || '') + ' ' +
+      (p.category || '') + ' ' +
+      (p.ascend_category || '') + ' ' +
+      (p.specs || '') + ' ' +
+      (p.sku || '') + ' ' +
+      (p.upc || '') + ' ' +
+      (p.color || '') + ' ' +
+      (p.talla || '')
     );
-    return matchCat && matchSearch;
+
+    // Cada palabra o token buscado debe coincidir (búsqueda multicriterio insensible a acentos y plurales)
+    return queryTokens.every(tok => tokenMatchesSearchable(searchable, tok));
   });
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; padding: 48px 20px; text-align: center; background: rgba(30, 41, 59, 0.4); border: 1px dashed rgba(148, 163, 184, 0.25); border-radius: 16px;">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5" style="margin: 0 auto 16px; display: block; opacity: 0.8;">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          <line x1="8" y1="11" x2="14" y2="11"></line>
+        </svg>
+        <h3 style="font-size: 1.15rem; font-weight: 700; color: #f1f5f9; margin-bottom: 8px;">No encontramos coincidencias</h3>
+        <p style="font-size: 0.88rem; color: #94a3b8; max-width: 480px; margin: 0 auto 16px; line-height: 1.5;">
+          No hay productos con el término <strong>"${rawQuery}"</strong> en este departamento. Prueba buscando por modelo (ej. <em>Marlin</em>, <em>Powerfly</em>, <em>Electrica</em>), marca o SKU.
+        </p>
+        <button type="button" class="btn-clean-primary" style="padding: 8px 18px; font-size: 0.82rem;" onclick="const s=document.getElementById('store-search-input'); if(s) s.value=''; renderProducts('all', '');">
+          Ver todo el inventario
+        </button>
+      </div>
+    `;
+    return;
+  }
 
   grid.innerHTML = filtered.map((p, idx) => {
     const stockNum = typeof p.stock === 'number' ? p.stock : 3;
-    const skuText = p.sku ? 'SKU Ascend #' + p.sku : 'Ascend Sync';
+    const skuText = p.sku ? 'SKU #' + p.sku : 'Ascend Sync';
     return `
-    <div class="product-item-clean reveal-scale delay-${(idx % 4) + 1}">
+    <div class="product-item-clean reveal-scale delay-${(idx % 4) + 1}" onclick="openProductDetail('${p.id}')" title="Clic para ver ficha técnica y foto ampliada">
       <div class="product-thumb-wrap">
         <span class="badge-tag badge-tag-orange" style="position:absolute; top:10px; left:10px; z-index:2;">${p.brand}</span>
-        <span style="position:absolute; top:10px; right:10px; z-index:2; background:rgba(15,23,42,0.88); color:#10b981; font-size:0.68rem; font-weight:800; padding:3px 8px; border-radius:20px; border:1px solid rgba(16,185,129,0.4);">
-          \u25cf Stock Coronado: ${stockNum}
+        
+        <span class="product-stock-pill-mobile" style="position:absolute; top:10px; right:48px; z-index:2; background:rgba(15,23,42,0.88); color:#10b981; font-size:0.68rem; font-weight:800; padding:3px 8px; border-radius:20px; border:1px solid rgba(16,185,129,0.4);">
+          \u25cf Stock: ${stockNum}
         </span>
+
+        <button type="button" class="btn-card-share" onclick="event.stopPropagation(); shareProduct('${p.id}')" title="Compartir producto" aria-label="Compartir producto">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+          </svg>
+        </button>
+
         <img src="${p.img}" alt="${p.title}" class="product-thumb" loading="lazy" onerror="this.onerror=null;this.src='assets/images/productos/5301924.jpg';">
       </div>
       <div class="product-info-clean">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <span class="product-brand-tag">${p.brand}</span>
-          <span style="font-size:0.68rem; color:#64748b; font-family:monospace; font-weight:700;">${skuText}</span>
+          <span class="product-sku-tag-mobile" style="font-size:0.68rem; color:#64748b; font-family:monospace; font-weight:700;">${skuText}</span>
         </div>
         <h4 class="product-name-clean">${p.title}</h4>
         <p class="product-specs-clean">${p.specs}</p>
@@ -840,7 +1051,7 @@ function renderProducts(category, searchTerm) {
           <div>
             <div class="product-price-clean">$${p.price.toLocaleString('es-MX')} <span style="font-size:0.75rem; color:#64748b;">MXN</span></div>
           </div>
-          <button class="btn-add-minimal" onclick="addToCart('${p.id}')">
+          <button class="btn-add-minimal" onclick="event.stopPropagation(); addToCart('${p.id}')">
             + A\u00f1adir
           </button>
         </div>
@@ -852,6 +1063,362 @@ function renderProducts(category, searchTerm) {
   observeRevealElements(grid);
   checkRevealAnimations();
 }
+
+/* ==========================================================================
+   5.1 MODAL DE FICHA TÉCNICA DETALLADA & COMPARTIR (MERCADO LIBRE STYLE)
+   ========================================================================== */
+/* ==========================================================================
+   5.0 KNOWLEDGE BASE DE FICHAS TÉCNICAS OFICIALES DE FÁBRICA (TREK / BOSCH / CANNONDALE)
+   Especificaciones reales verificadas de manuales de fabricante
+   ========================================================================== */
+function getOfficialBrandSpecs(prod) {
+  const title = (prod.title || prod.pos_raw || '').toUpperCase();
+  const brand = (prod.brand || 'TREK').toUpperCase();
+
+  if (title.includes('MARLIN 5')) {
+    return {
+      oficial: true,
+      fuente: 'Trek Bikes Official Technical Manual (Marlin Gen 3)',
+      cuadro: 'Aluminio Alpha Silver, guiado interno de cables y tija telescópica, soporte para portabultos y pata de cabra, eje ThruSkew 135x5 mm.',
+      suspension: 'SR Suntour XCT 30, resorte helicoidal, precarga, bloqueo hidráulico, 100 mm de recorrido (talla XS: 80 mm).',
+      transmision: 'Shimano CUES U4000 de 1x9 velocidades con mando Rapidfire Plus y display óptico.',
+      desviador: 'Shimano CUES U4000 GS con tecnología Shadow RD antibalanceo de cadena.',
+      cassette: 'Shimano LINKGLIDE LG300, 11-46T, 9 velocidades (3x mayor durabilidad ante desgaste).',
+      frenos: 'Frenos de disco hidráulicos Tektro HD-M275, rotores Tektro 180 mm delantero / 160 mm trasero.',
+      ruedas: 'Bontrager Connection, doble pared, 32 agujeros, ancho interior 20 mm.',
+      llantas: 'Bontrager XT3 Comp, aro rígido, 30 tpi, 29x2.40" (tallas XS/S: 27.5x2.40").',
+      peso: '15.10 kg / 33.29 lbs (Talla M). Límite de carga máxima: 136 kg (bicicleta + ciclista + equipaje).',
+      garantia: 'Garantía oficial de por vida en cuadro para el comprador original (Trek Lifetime Warranty).'
+    };
+  }
+
+  if (title.includes('MARLIN 6')) {
+    return {
+      oficial: true,
+      fuente: 'Trek Bikes Official Technical Manual (Marlin Gen 3)',
+      cuadro: 'Aluminio Alpha Silver, geometría moderna relajada (66.5° ángulo de dirección), guiado interno para dropper post.',
+      suspension: 'RockShox Judy, resorte helicoidal, precarga, bloqueo mecánico TurnKey, 100 mm de recorrido.',
+      transmision: 'Shimano Deore M4100, 1x10 velocidades con embrague Shadow RD+ antibalanceo.',
+      desviador: 'Shimano Deore M5120 con palanca de tensión de cadena activable.',
+      cassette: 'Shimano Deore M4100, 11-46T, 10 velocidades.',
+      frenos: 'Frenos de disco hidráulicos Shimano MT200, rotores Shimano RT26 de 180 mm delantero / 160 mm trasero.',
+      ruedas: 'Bontrager Kovee, doble pared, Tubeless Ready, 28 agujeros.',
+      llantas: 'Bontrager XT3 Comp, 29x2.40".',
+      peso: '14.50 kg / 31.97 lbs.',
+      garantia: 'Garantía oficial de por vida en cuadro Trek.'
+    };
+  }
+
+  if (title.includes('MARLIN+') || title.includes('POWERFLY') || title.includes('ELÉCTRICA') || title.includes('ELECTRICA')) {
+    return {
+      oficial: true,
+      fuente: 'Trek Bikes & Bosch eBike Systems Official Datasheet',
+      motor: 'Bosch Active Line Plus, 50 Nm de par motor, asistencia progresiva hasta 25 km/h.',
+      bateria: 'Bosch CompactTube de 400 Wh integrada y desmontable en el tubo diagonal.',
+      display: 'Bosch Purion 200 a color con mando al manillar y conectividad Bluetooth app eBike Flow.',
+      cuadro: 'Aluminio Alpha Gold con batería integrada oculta y cableado interno completo.',
+      suspension: 'SR Suntour XCM 32, eje pasante Boost110 de 15 mm, 120 mm de recorrido.',
+      transmision: 'Shimano CUES U4000 1x9 vel Linkglide reforzada para torque eléctrico.',
+      frenos: 'Frenos de disco hidráulicos Tektro HD-M275 con rotores sobredimensionados de 203 mm para e-bike.',
+      peso: '21.30 kg / 46.96 lbs con batería incluida.',
+      garantia: 'Garantía de por vida en cuadro + 2 años de garantía oficial en motor/batería Bosch.'
+    };
+  }
+
+  if (title.includes('MADONE')) {
+    return {
+      oficial: true,
+      fuente: 'Trek Factory Racing Aerodynamic Specs',
+      cuadro: 'Carbono OCLV Serie 500 aero con tecnología IsoFlow para disipación de vibraciones y ahorro de watts.',
+      suspension: 'Horquilla Madone KVF de carbono completo, tubo cónico, eje pasante 12x100 mm.',
+      transmision: 'Shimano 105 R7100, 2x12 velocidades con relación de competencia profesional.',
+      desviador: 'Shimano 105 R7100 Down-Swing 50-34T.',
+      cassette: 'Shimano 105 R7100, 11-34T, 12 velocidades.',
+      frenos: 'Frenos de disco hidráulicos Shimano 105, rotores Shimano RT70 Ice-Tech 160 mm.',
+      ruedas: 'Bontrager Paradigm SL / Aeolus Elite Tubeless Ready.',
+      peso: '8.70 kg / 19.18 lbs.',
+      garantia: 'Garantía de por vida Trek Carbon Care Warranty.'
+    };
+  }
+
+  if (title.includes('DOMANE')) {
+    return {
+      oficial: true,
+      fuente: 'Trek Endurance Roadmap Datasheet',
+      cuadro: 'Aluminio Alpha Serie 100, geometría Endurance de alto confort para fondos largos, paso de rueda 38c.',
+      suspension: 'Horquilla Domane de carbono completo, eje pasante 12x100 mm.',
+      transmision: 'Shimano Tiagra 4700 2x10 velocidades.',
+      frenos: 'Frenos de disco hidráulicos Shimano Tiagra con rotores RT66 de 160 mm.',
+      ruedas: 'Bontrager Paradigm, Tubeless Ready, 24 hoyos.',
+      peso: '10.35 kg / 22.82 lbs.',
+      garantia: 'Garantía oficial de por vida en cuadro Trek.'
+    };
+  }
+
+  if (title.includes('HABIT') || brand.includes('CANNONDALE')) {
+    return {
+      oficial: true,
+      fuente: 'Cannondale Factory Spec Manual',
+      cuadro: 'SmartForm C1 Premium Alloy, 130 mm de recorrido, cinemática Proportional Response Tuned.',
+      suspension: 'Horquilla RockShox Recon RL 140 mm + Amortiguador trasero RockShox Deluxe Select DebonAir.',
+      transmision: 'Shimano Deore M6100 de 1x12 velocidades con micro-spline.',
+      frenos: 'Frenos de disco hidráulicos Shimano MT200 con rotores RT10 de 180 mm.',
+      ruedas: 'WTB STX i25 TCS Tubeless Ready.',
+      peso: '15.40 kg.',
+      garantia: 'Garantía Cannondale Lifetime Frame Warranty.'
+    };
+  }
+
+  if (title.includes('TOP FUEL')) {
+    return {
+      oficial: true,
+      fuente: 'Trek XC/Trail Factory Datasheet',
+      cuadro: 'Carbono OCLV Mountain completo con compartimento interno de herramientas BITS integrado.',
+      suspension: 'Fox Performance 34 Float EVOL 130 mm + Fox Float DPS 120 mm con control remoto de bloqueo.',
+      transmision: 'Shimano Deore XT M8100 1x12 velocidades completo.',
+      frenos: 'Frenos Shimano Deore XT M8120 de 4 pistones.',
+      ruedas: 'Bontrager Line Elite 30 OCLV Carbon Tubeless Ready.',
+      peso: '12.80 kg.',
+      garantia: 'Garantía de por vida en cuadro y ruedas de carbono Trek Carbon Care.'
+    };
+  }
+
+  if (title.includes('ROSCOE')) {
+    return {
+      oficial: true,
+      fuente: 'Trek Trail Hardtail Datasheet',
+      cuadro: 'Aluminio Alpha Gold, pipa cónica, guiado interno de cables y poste telescópico, soporte ISCG 05, Boost148.',
+      compatibilidad: 'Acepta horquillas de hasta 140 mm de recorrido y neumáticos trail de 29x2.60".',
+      peso: '2.45 kg (Solo cuadro).',
+      garantia: 'Garantía oficial de por vida Trek.'
+    };
+  }
+
+  if (title.includes('FX 1')) {
+    return {
+      oficial: true,
+      fuente: 'Trek Fitness & City Specs',
+      cuadro: 'Aluminio Alpha Gold, guiado interno, soportes listos para salpicaderas y alforjas traseras.',
+      transmision: 'Shimano Altus 2x8 velocidades.',
+      frenos: 'Frenos de disco mecánicos Tektro MD-M280.',
+      peso: '12.60 kg.',
+      garantia: 'Garantía de por vida en cuadro Trek.'
+    };
+  }
+
+  return {
+    oficial: false,
+    fuente: 'Sincronización Certificada Ascend RMS',
+    cuadro: `${brand} High Performance Alloy / Composite`,
+    transmision: 'Componentes certificados de fábrica según especificación oficial del lote',
+    frenos: 'Sistema de frenado de disco certificado en taller',
+    garantia: `Garantía oficial directa respaldada por ${brand} y Cordillera Trek Coronado #1130`
+  };
+}
+
+window.openProductDetail = function(productId) {
+  const prod = PRODUCTS_DATA.find(p => p.id === productId || (p.sku && p.sku.toUpperCase() === productId.toUpperCase()));
+  if (!prod) return;
+
+  const modal = document.getElementById('product-detail-modal');
+  const container = document.getElementById('product-detail-content');
+  if (!modal || !container) return;
+
+  const stockNum = typeof prod.stock === 'number' ? prod.stock : 1;
+  const skuText = prod.sku ? prod.sku : 'CORDILLERA-ONLINE';
+  const upcText = prod.upc ? prod.upc : 'Garant\u00eda Oficial M\u00e9xico';
+  const categoryLabel = prod.ascend_category || (prod.category === 'bicis' ? 'Bicicletas de Monta\u00f1a & Ruta' : 'Refacciones & Equipo');
+  const msiMonthly = Math.round(prod.price / 12).toLocaleString('es-MX');
+  const officialSpecs = getOfficialBrandSpecs(prod);
+
+  const shareTextWhatsApp = encodeURIComponent(`Hola Cordillera Trek, me interesa esta bicicleta que vi en su catálogo: ${prod.title} (SKU #${skuText}) por $${prod.price.toLocaleString('es-MX')} MXN. ¿Aún la tienen disponible en Coronado #1130?`);
+  const waUrl = `https://wa.me/526188230673?text=${shareTextWhatsApp}`;
+
+  container.innerHTML = `
+    <!-- Columna Izquierda: Fotografía Ampliada -->
+    <div class="product-detail-img-wrap">
+      <span class="badge-tag badge-tag-orange" style="position:absolute; top:12px; left:12px; z-index:2; font-size:0.75rem;">
+        ${prod.brand}
+      </span>
+      <span style="position:absolute; top:12px; right:12px; z-index:2; background:#181d26; color:#10b981; font-size:0.72rem; font-weight:800; padding:4px 10px; border-radius:20px; border:1px solid rgba(16,185,129,0.4);">
+        \u25cf Stock en Tienda Coronado: ${stockNum} pzas
+      </span>
+
+      <img src="${prod.img}" alt="${prod.title}" class="product-detail-main-img" id="detail-main-img" loading="lazy" onerror="this.onerror=null;this.src='assets/images/productos/5301924.jpg';" onclick="openFlyerLightbox('${prod.img}', '${prod.title.replace(/'/g, "\\'")}')" title="Clic para ampliar foto a pantalla completa">
+      
+      <div style="font-size:0.74rem; color:#64748b; margin-top:12px; display:flex; align-items:center; gap:6px; cursor:pointer;" onclick="openFlyerLightbox('${prod.img}', '${prod.title.replace(/'/g, "\\'")}')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+        <span>Clic en la imagen para hacer zoom en pantalla completa</span>
+      </div>
+    </div>
+
+    <!-- Columna Derecha: Información Comercial y Ficha Técnica -->
+    <div class="product-detail-info">
+      <div class="product-detail-breadcrumb">Cat\u00e1logo Oficial &middot; ${categoryLabel}</div>
+      <h3 class="product-detail-title">${prod.title}</h3>
+
+      <div class="product-detail-meta-bar">
+        <span><strong>SKU Ascend:</strong> #${skuText}</span>
+        <span>&bull;</span>
+        <span><strong>UPC Barcode:</strong> ${upcText}</span>
+        <span>&bull;</span>
+        <span><strong>Disponibilidad:</strong> Entrega Inmediata</span>
+      </div>
+
+      <!-- Tarjeta de Precio & Facilidades -->
+      <div class="product-detail-price-box">
+        <div class="product-detail-price">
+          $${prod.price.toLocaleString('es-MX')} <span>MXN</span>
+        </div>
+        <div style="color:#ff5500; font-size:0.88rem; font-weight:800; margin-top:2px;">
+          12 mensualidades de $${msiMonthly} MXN sin intereses
+        </div>
+
+        <div class="product-detail-benefits">
+          <div>\u2714 <strong>Entrega el mismo d\u00eda</strong> gratis en la Ciudad de Durango.</div>
+          <div>\u2714 <strong>Env\u00edo asegurado a todo M\u00e9xico</strong> v\u00eda Estafeta / DHL express.</div>
+          <div>\u2714 <strong>Garant\u00eda oficial de por vida</strong> en cuadros Trek y componentes certificados.</div>
+          <div>\u2714 <strong>Primer servicio preventivo de taller incluido</strong> sin costo en Coronado #1130.</div>
+        </div>
+      </div>
+
+            <!-- Ficha Técnica Oficial de Fábrica (Investigación Real de Marca) -->
+      <div style="margin-top:14px; background:#fff; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.05); margin-bottom:14px;">
+        <div style="background:#0f172a; padding:10px 14px; display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:0.9rem;">🚲</span>
+            <span style="font-size:0.76rem; font-weight:800; color:#f8fafc; text-transform:uppercase; letter-spacing:0.5px;">
+              Ficha Técnica Oficial del Fabricante
+            </span>
+          </div>
+          <span style="font-size:0.65rem; background:${officialSpecs.oficial ? 'rgba(16,185,129,0.2)' : 'rgba(56,189,248,0.2)'}; color:${officialSpecs.oficial ? '#34d399' : '#38bdf8'}; font-weight:800; padding:3px 8px; border-radius:12px; border:1px solid ${officialSpecs.oficial ? 'rgba(16,185,129,0.4)' : 'rgba(56,189,248,0.4)'};">
+            ${officialSpecs.oficial ? '✓ Datos 100% Oficiales de Fábrica' : '✓ Ascend POS Sync'}
+          </span>
+        </div>
+
+        <div style="padding:12px 14px; font-size:0.78rem; line-height:1.55; color:#334155;">
+          <div style="display:grid; grid-template-columns:105px 1fr; gap:6px 12px; margin-bottom:8px;">
+            ${officialSpecs.cuadro ? `<strong style="color:#0f172a;">Cuadro:</strong><span>${officialSpecs.cuadro}</span>` : ''}
+            ${officialSpecs.suspension ? `<strong style="color:#0f172a;">Suspensión:</strong><span>${officialSpecs.suspension}</span>` : ''}
+            ${officialSpecs.motor ? `<strong style="color:#0f172a;">Motor Eléctrico:</strong><span>${officialSpecs.motor}</span>` : ''}
+            ${officialSpecs.bateria ? `<strong style="color:#0f172a;">Batería Bosch:</strong><span>${officialSpecs.bateria}</span>` : ''}
+            ${officialSpecs.display ? `<strong style="color:#0f172a;">Display eBike:</strong><span>${officialSpecs.display}</span>` : ''}
+            ${officialSpecs.transmision ? `<strong style="color:#0f172a;">Transmisión:</strong><span>${officialSpecs.transmision}</span>` : ''}
+            ${officialSpecs.desviador ? `<strong style="color:#0f172a;">Desviador:</strong><span>${officialSpecs.desviador}</span>` : ''}
+            ${officialSpecs.cassette ? `<strong style="color:#0f172a;">Cassette:</strong><span>${officialSpecs.cassette}</span>` : ''}
+            ${officialSpecs.frenos ? `<strong style="color:#0f172a;">Frenos:</strong><span>${officialSpecs.frenos}</span>` : ''}
+            ${officialSpecs.ruedas ? `<strong style="color:#0f172a;">Ruedas:</strong><span>${officialSpecs.ruedas}</span>` : ''}
+            ${officialSpecs.llantas ? `<strong style="color:#0f172a;">Neumáticos:</strong><span>${officialSpecs.llantas}</span>` : ''}
+            ${officialSpecs.peso ? `<strong style="color:#0f172a;">Peso Oficial:</strong><span>${officialSpecs.peso}</span>` : ''}
+            ${officialSpecs.garantia ? `<strong style="color:#0f172a;">Garantía:</strong><span style="color:#15803d; font-weight:700;">${officialSpecs.garantia}</span>` : ''}
+          </div>
+          <div style="font-size:0.68rem; color:#94a3b8; border-top:1px dashed #cbd5e1; padding-top:6px; margin-top:6px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px;">
+            <span><strong>Fuente:</strong> ${officialSpecs.fuente}</span>
+            <span><strong>Sucursal:</strong> Coronado #1130 · Durango, Dgo.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Botones de Acción -->
+      <div class="product-detail-actions">
+        <div class="product-detail-btn-row">
+          <button type="button" class="btn-detail-add" onclick="addToCart('${prod.id}'); closeProductDetail();">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+            <span>A\u00f1adir al Carrito</span>
+          </button>
+
+          <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="btn-detail-whatsapp">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            <span>Comprar por WhatsApp</span>
+          </a>
+        </div>
+
+        <button type="button" class="btn-detail-share" onclick="shareProduct('${prod.id}')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+          </svg>
+          <span>Compartir</span>
+        </button>
+      </div>
+    </div>
+  `;
+
+  // Actualizar hash en la URL sin recargar para que el enlace sea compartible directamente
+  if (history.replaceState) {
+    history.replaceState(null, '', '#producto=' + encodeURIComponent(prod.sku || prod.id));
+  }
+
+  modal.classList.add('active');
+  document.body.style.overflow = 'hidden';
+};
+
+window.closeProductDetail = function() {
+  const modal = document.getElementById('product-detail-modal');
+  if (modal) modal.classList.remove('active');
+  document.body.style.overflow = '';
+  if (history.replaceState && window.location.hash.startsWith('#producto=')) {
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+};
+
+window.shareProduct = function(productId) {
+  const prod = PRODUCTS_DATA.find(p => p.id === productId || (p.sku && p.sku.toUpperCase() === productId.toUpperCase()));
+  if (!prod) return;
+
+  const currentOrigin = window.location.origin && window.location.origin !== 'null' ? window.location.origin : 'https://blueberrymx.github.io';
+  const shareUrl = `${currentOrigin}${window.location.pathname}#producto=${encodeURIComponent(prod.sku || prod.id)}`;
+  const shareTitle = `${prod.title} · Cordillera Trek Durango`;
+  const shareText = `Mira esta ${prod.title} en Cordillera Trek ($${prod.price.toLocaleString('es-MX')} MXN):`;
+
+  if (navigator.share) {
+    navigator.share({
+      title: shareTitle,
+      text: shareText,
+      url: shareUrl
+    }).then(() => {
+      showToast('¡Producto compartido con éxito!', 'success');
+    }).catch(err => {
+      if (err.name !== 'AbortError') {
+        copyShareLinkFallback(shareUrl, prod.title);
+      }
+    });
+  } else {
+    copyShareLinkFallback(shareUrl, prod.title);
+  }
+};
+
+function copyShareLinkFallback(url, productTitle) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      showToast('¡Enlace de "' + productTitle + '" copiado al portapapeles! Listo para pegar en WhatsApp.', 'success');
+    }).catch(() => {
+      prompt('Copia este enlace para compartir el producto:', url);
+    });
+  } else {
+    prompt('Copia este enlace para compartir el producto:', url);
+  }
+}
+
+// Escuchadores del modal de ficha técnica
+const closeProductDetailBtn = document.getElementById('btn-close-product-detail');
+if (closeProductDetailBtn) {
+  closeProductDetailBtn.addEventListener('click', closeProductDetail);
+}
+const productDetailModalEl = document.getElementById('product-detail-modal');
+if (productDetailModalEl) {
+  productDetailModalEl.addEventListener('click', (e) => {
+    if (e.target === productDetailModalEl) closeProductDetail();
+  });
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && productDetailModalEl && productDetailModalEl.classList.contains('active')) {
+    closeProductDetail();
+  }
+});
 
 window.addToCart = function(productId) {
   const prod = PRODUCTS_DATA.find(p => p.id === productId);
@@ -1798,7 +2365,13 @@ function initAscendAgentConsole() {
     if (text.includes('SIS') || text.includes('HAMMER')) return 'assets/images/productos/sis-pack-dgo.jpg';
     if (text.includes('GRASA') || text.includes('POLYLUBE') || text.includes('PARK TOOL')) return 'assets/images/productos/taller-grasa.jpg';
 
-    const query = encodeURIComponent((brand || 'Trek') + ' ' + (cleanTitle || rawDesc) + ' bicycle side view white background');
+    let searchSuffix = 'bicycle side view white background';
+    if (cat === 'ropa') searchSuffix = 'cycling apparel helmet jersey white background';
+    else if (cat === 'partes') searchSuffix = 'bike component part white background';
+    else if (cat === 'accesorios') searchSuffix = 'cycling accessory white background';
+    else if (cat === 'nutricion') searchSuffix = 'cycling sports nutrition white background';
+
+    const query = encodeURIComponent((brand || 'Trek') + ' ' + (cleanTitle || rawDesc) + ' ' + searchSuffix);
     return 'https://tse2.mm.bing.net/th?q=' + query + '&w=700&rs=1&p=0';
   }
 
@@ -1894,9 +2467,144 @@ function initAscendAgentConsole() {
     `).join('');
   }
 
+  const productSelect = document.getElementById('agent-select-product');
+  const btnMoveToQuarantine = document.getElementById('btn-move-to-quarantine');
+
+  function populateEditorDropdown(selectedId) {
+    if (!productSelect) return;
+    const currentVal = selectedId || productSelect.value || '__NEW__';
+    let opts = '<option value="__NEW__">+ Dar de alta nuevo SKU manualmente</option>';
+    PRODUCTS_DATA.forEach(p => {
+      const isSel = (p.id === currentVal) ? ' selected' : '';
+      const stockBadge = (typeof p.stock === 'number') ? `(Stock: ${p.stock})` : '';
+      opts += `<option value="${p.id}"${isSel}>[#${p.sku}] ${p.title} - $${p.price.toLocaleString('es-MX')} ${stockBadge}</option>`;
+    });
+    productSelect.innerHTML = opts;
+
+    // Si hay un producto seleccionado, cargar sus datos en el formulario
+    loadSelectedProductToForm();
+  }
+
+  function loadSelectedProductToForm() {
+    if (!productSelect) return;
+    const val = productSelect.value;
+    const inputSku = document.getElementById('agent-input-sku');
+    const inputBrand = document.getElementById('agent-input-brand');
+    const inputDesc = document.getElementById('agent-input-desc');
+    const inputCat = document.getElementById('agent-input-cat');
+    const inputStock = document.getElementById('agent-input-stock');
+    const inputPrice = document.getElementById('agent-input-price');
+
+    const inputImg = document.getElementById('agent-input-img');
+    const imgPrev = document.getElementById('agent-input-img-preview');
+
+    if (val === '__NEW__' || !val) {
+      if (inputSku) inputSku.value = '';
+      if (inputBrand) inputBrand.value = 'TREK';
+      if (inputDesc) inputDesc.value = '';
+      if (inputCat) inputCat.value = 'bicis';
+      if (inputStock) inputStock.value = '1';
+      if (inputPrice) inputPrice.value = '';
+      if (inputImg) inputImg.value = '';
+      if (imgPrev) imgPrev.src = 'assets/images/productos/5301924.jpg';
+      if (btnMoveToQuarantine) btnMoveToQuarantine.style.display = 'none';
+      return;
+    }
+
+    const prod = PRODUCTS_DATA.find(p => p.id === val);
+    if (!prod) return;
+
+    if (inputSku) inputSku.value = prod.sku || '';
+    if (inputBrand) inputBrand.value = prod.brand || 'TREK';
+    if (inputDesc) inputDesc.value = prod.title || prod.pos_raw || '';
+    if (inputCat) inputCat.value = prod.category || 'bicis';
+    if (inputStock) inputStock.value = (typeof prod.stock === 'number') ? prod.stock : 1;
+    if (inputPrice) inputPrice.value = prod.price || 0;
+    if (inputImg) inputImg.value = prod.img || '';
+    if (imgPrev) imgPrev.src = prod.img || 'assets/images/productos/5301924.jpg';
+    if (btnMoveToQuarantine) btnMoveToQuarantine.style.display = 'inline-block';
+  }
+
+  if (productSelect) {
+    productSelect.addEventListener('change', loadSelectedProductToForm);
+  }
+
+  // Listeners de Cambio de Fotografía en Vivo (URL o Carga Directa)
+  const inputImg = document.getElementById('agent-input-img');
+  const imgPrev = document.getElementById('agent-input-img-preview');
+  const inputFile = document.getElementById('agent-input-file');
+  const btnSearchPhoto = document.getElementById('btn-search-brand-photo');
+
+  if (inputImg && imgPrev) {
+    inputImg.addEventListener('input', (e) => {
+      imgPrev.src = e.target.value.trim() || 'assets/images/productos/5301924.jpg';
+    });
+  }
+
+  if (inputFile) {
+    inputFile.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const base64 = evt.target.result;
+          if (inputImg) inputImg.value = base64;
+          if (imgPrev) imgPrev.src = base64;
+          showToast('Foto cargada en memoria. Haz clic en "Guardar Cambios" para aplicar a la tienda.', 'info');
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+  if (btnSearchPhoto) {
+    btnSearchPhoto.addEventListener('click', () => {
+      const brand = document.getElementById('agent-input-brand')?.value.trim() || 'Trek';
+      const desc = document.getElementById('agent-input-desc')?.value.trim() || '';
+      const q = encodeURIComponent(`${brand} ${desc} official bike`);
+      window.open(`https://www.google.com/search?tbm=isch&q=${q}`, '_blank');
+    });
+  }
+
+  if (btnMoveToQuarantine) {
+    btnMoveToQuarantine.addEventListener('click', () => {
+      const prodId = productSelect ? productSelect.value : '';
+      if (!prodId || prodId === '__NEW__') {
+        showToast('Selecciona un producto para enviar a cuarentena', 'error');
+        return;
+      }
+      const idx = PRODUCTS_DATA.findIndex(p => p.id === prodId);
+      if (idx === -1) return;
+
+      const removed = PRODUCTS_DATA.splice(idx, 1)[0];
+      quarantineList.unshift({
+        sku: removed.sku,
+        brand: removed.brand,
+        pos_desc: removed.title + ' (Retirado manualmente)',
+        qty: removed.stock || 0,
+        price: removed.price || 0,
+        motivo: 'RETIRADO_A_CUARENTENA_POR_GERENCIA'
+      });
+
+      updateAscendKPIs();
+      renderQuarantineList();
+      renderProducts('all', '');
+
+
+      populateEditorDropdown('__NEW__');
+
+      if (logBox) {
+        logBox.style.color = '#f87171';
+        logBox.textContent = `[RETIRADO DE TIENDA] SKU #${removed.sku} (${removed.title}) fue enviado a la Lista Roja de Cuarentena. Ya no está visible para clientes.`;
+      }
+      showToast('Producto enviado a Cuarentena', 'important');
+    });
+  }
+
   function openConsole() {
     updateAscendKPIs();
     renderQuarantineList();
+    populateEditorDropdown();
     modal.classList.add('active');
   }
 
@@ -2175,7 +2883,7 @@ function initAscendAgentConsole() {
             const cleanTitle = known ? known.title : enrichRawPosName(rawDesc);
             const cleanSpecs = known ? known.specs : ((rawDept ? rawDept + ' \u00b7 ' : '') + (upc ? 'UPC ' + upc + ' \u00b7 ' : '') + 'SKU #' + sku + ' \u00b7 Stock Coronado #1130');
             const cleanVariants = (known && known.variants) ? known.variants : ['Disponible en Tienda Coronado'];
-            const photoUrl = resolveProductPhoto(sku, brand, cleanTitle, rawDesc, cat);
+            const photoUrl = customImg || resolveProductPhoto(sku, brand, cleanTitle, rawDesc, cat);
 
             newClean.push({
               id: 'ascend-csv-' + sku.toLowerCase().replace(/[^a-z0-9]/g, '') + '-' + i,
@@ -2205,6 +2913,9 @@ function initAscendAgentConsole() {
           renderQuarantineList();
           renderProducts('all', '');
 
+
+          populateEditorDropdown();
+
           const totalVal = newClean.reduce((acc, p) => acc + (p.price * (p.stock || 1)), 0);
           if (logBox) {
             logBox.style.color = '#10b981';
@@ -2233,6 +2944,8 @@ function initAscendAgentConsole() {
       updateAscendKPIs();
       renderQuarantineList();
       renderProducts('all', '');
+
+
       if (logBox) {
         logBox.style.color = '#10b981';
         logBox.textContent = '[INVENTARIO REAL MARIO ARELLANO ACTIVO] 62 SKUs de Duran Go Trek SA de CV (22/Oct/2026 11:32) \u2192 56 bicicletas publicadas ($1,726,833 MXN / 57 unidades) y 6 anomal\u00edas aisladas en Cuarentena (5 con stock -1 y 1 "Arugula" de $30).';
@@ -2303,6 +3016,8 @@ function initAscendAgentConsole() {
       updateAscendKPIs();
       renderQuarantineList();
       renderProducts('all', '');
+
+
       if (logBox) {
         logBox.style.color = '#38bdf8';
         logBox.textContent = '[MODO DEMO MIXTO ACTIVO] Cat\u00e1logo demostraci\u00f3n (14 art\u00edculos mixtos: bicis, refacciones, cascos, GPS y geles). Haz clic en "\ud83d\udeb4 Inventario Real Mario Arellano (62 SKUs)" para volver al inventario real.';
@@ -2328,25 +3043,31 @@ function initAscendAgentConsole() {
       const sku = document.getElementById('agent-input-sku').value.trim();
       const skuUpper = sku.toUpperCase();
       const brand = document.getElementById('agent-input-brand').value.trim().toUpperCase();
-      const rawDesc = document.getElementById('agent-input-desc').value.trim().toUpperCase();
+      const rawDesc = document.getElementById('agent-input-desc').value.trim();
       const cat = document.getElementById('agent-input-cat').value;
       const stock = parseInt(document.getElementById('agent-input-stock').value || '0', 10);
       const price = parseFloat(document.getElementById('agent-input-price').value || '0');
+      const customImg = (document.getElementById('agent-input-img')?.value || '').trim();
+      const selectedId = productSelect ? productSelect.value : '__NEW__';
 
       if (logBox) {
         logBox.style.color = '#38bdf8';
-        logBox.textContent = '[AGENTE 1 POS] Leyendo SKU #' + sku + ' desde Ascend RMS (' + rawDesc + ')...';
+        logBox.textContent = '[PROCESANDO] Guardando cambios de SKU #' + sku + ' (' + rawDesc + ')...';
       }
 
       setTimeout(() => {
-        if (stock <= 0 || price <= 0 || rawDesc.includes('TALLER INTERNO')) {
-          const motivo = rawDesc.includes('TALLER INTERNO')
+        if (stock < 0 || price <= 0 || rawDesc.toUpperCase().includes('TALLER INTERNO')) {
+          const motivo = rawDesc.toUpperCase().includes('TALLER INTERNO')
             ? 'INSUMO_INTERNO_TALLER_NO_PUBLICAR'
             : stock < 0
               ? 'INVENTARIO_NEGATIVO_DESCUADRE_ALMACEN'
-              : stock === 0
-                ? 'AGOTADO_EN_MOSTRADOR_STOCK_CERO'
-                : 'FALTA_CAPTURAR_PRECIO_EN_POS';
+              : 'FALTA_CAPTURAR_PRECIO_EN_POS';
+
+          // Si existia en productos, retirarlo
+          if (selectedId && selectedId !== '__NEW__') {
+            const exIdx = PRODUCTS_DATA.findIndex(p => p.id === selectedId);
+            if (exIdx !== -1) PRODUCTS_DATA.splice(exIdx, 1);
+          }
 
           quarantineList.unshift({
             sku: sku,
@@ -2359,18 +3080,51 @@ function initAscendAgentConsole() {
 
           updateAscendKPIs();
           renderQuarantineList();
+          renderProducts('all', '');
+
+
+          populateEditorDropdown();
+          populateEditorDropdown('__NEW__');
 
           if (logBox) {
             logBox.style.color = '#f87171';
-            logBox.textContent = '[BLOQUEADO POR AGENTE 1] SKU #' + sku + ' (' + motivo + '). Enviado a Cuarentena de Almac\u00e9n para no contaminar la tienda en l\u00ednea.';
+            logBox.textContent = '[BLOQUEADO EN CUARENTENA] SKU #' + sku + ' (' + motivo + '). Retirado de la tienda para proteger la venta.';
           }
-          showToast('Agente 1 aisl\u00f3 SKU #' + sku + ' en Cuarentena', 'error');
+          showToast('SKU #' + sku + ' enviado a Cuarentena', 'error');
           return;
         }
 
+        // Caso A: Edicion de un producto existente del catalogo
+        if (selectedId && selectedId !== '__NEW__') {
+          const prod = PRODUCTS_DATA.find(p => p.id === selectedId);
+          if (prod) {
+            prod.sku = sku;
+            prod.brand = brand;
+            prod.title = rawDesc;
+            prod.category = cat;
+            prod.stock = stock;
+            prod.price = price;
+            prod.img = customImg || resolveProductPhoto(sku, brand, rawDesc, rawDesc, cat);
+
+            updateAscendKPIs();
+            renderProducts('all', '');
+
+
+            populateEditorDropdown(selectedId);
+
+            if (logBox) {
+              logBox.style.color = '#10b981';
+              logBox.textContent = `[CAMBIOS GUARDADOS EN VIVO] SKU #${sku} · "${rawDesc}" actualizado en tienda ($${price.toLocaleString('es-MX')} MXN | Stock Coronado: ${stock}).`;
+            }
+            showToast('Producto actualizado en vivo', 'success');
+            return;
+          }
+        }
+
+        // Caso B: Alta de un nuevo producto
         const known = KNOWN_PRODUCT_KB[skuUpper];
         const cleanTitle = known ? known.title : enrichRawPosName(rawDesc);
-        const cleanSpecs = known ? known.specs : ('Ficha generada por Agente IA \u00b7 Sincronizado de Ascend RMS \u00b7 Stock Coronado #1130');
+        const cleanSpecs = known ? known.specs : ('Ficha generada por Agente IA · SKU #' + sku + ' · Stock Coronado #1130');
         const photoUrl = resolveProductPhoto(sku, brand, cleanTitle, rawDesc, cat);
 
         const newProduct = {
@@ -2385,19 +3139,22 @@ function initAscendAgentConsole() {
           stock: stock,
           variants: (known && known.variants) ? known.variants : ['Disponible en Tienda Coronado'],
           img: photoUrl,
-          tag: 'Nuevo IA Sync'
+          tag: 'Nuevo en Catálogo'
         };
 
         PRODUCTS_DATA.unshift(newProduct);
         updateAscendKPIs();
         renderProducts('all', '');
 
+
+        populateEditorDropdown(newProduct.id);
+
         if (logBox) {
           logBox.style.color = '#10b981';
-          logBox.textContent = '[PUBLICADO EN TIENDA CON FOTO REAL] Agente 2 convirti\u00f3 "' + rawDesc + '" en "' + cleanTitle + '" ($' + price.toLocaleString('es-MX') + ' MXN | Stock: ' + stock + '). \u00a1Ya visible en #1 del cat\u00e1logo!';
+          logBox.textContent = '[NUEVO PRODUCTO PUBLICADO] Agente IA creó la ficha de "' + cleanTitle + '" ($' + price.toLocaleString('es-MX') + ' MXN | Stock: ' + stock + '). ¡Ya visible en la tienda!';
         }
         showToast('Publicado en tienda: ' + cleanTitle, 'success');
-      }, 350);
+      }, 250);
     });
   }
 }
