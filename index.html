@@ -1199,37 +1199,30 @@
 
       <!-- Dos Columnas: Simulador en Vivo IA + Tabla de Cuarentena -->
       <div style="display:grid; grid-template-columns:1.1fr 1fr; gap:18px;">
-        <!-- Columna Izquierda: Prueba en Vivo del Agente Catalogador IA -->
+        <!-- Columna Izquierda: Editor e Inspector de Productos en Vivo -->
         <div style="background:#181d26; color:#fff; border-radius:10px; padding:16px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <span style="color:#ffb800; font-size:0.75rem; font-weight:800; letter-spacing:0.5px;">PRUEBA EN VIVO CON EL DUE&Ntilde;O</span>
-            <span style="font-size:0.7rem; background:rgba(255,85,0,0.2); color:#ff5500; padding:2px 8px; border-radius:10px; font-weight:700;">Agente 1 + Agente 2 IA</span>
+            <span style="color:#ffb800; font-size:0.75rem; font-weight:800; letter-spacing:0.5px;">EDITOR DE CAT&Aacute;LOGO EN VIVO</span>
+            <span style="font-size:0.7rem; background:rgba(16,185,129,0.2); color:#10b981; padding:2px 8px; border-radius:10px; font-weight:700;">Modificar o Crear Ficha</span>
           </div>
-          <h4 style="font-size:1rem; color:#fff; margin-bottom:6px;">Simular Alta desde Ascend RMS &rarr; Tienda Web</h4>
-          <p style="font-size:0.78rem; color:#cbd5e1; margin-bottom:12px; line-height:1.4;">
-            Escribe un nombre corto/abreviado tal como sale en <strong>Ascend RMS</strong> (o usa un bot&oacute;n r&aacute;pido). Si tiene stock &ge; 1, el Agente IA redacta la ficha técnica, le asigna foto y lo publica en la tienda; si tiene stock 0 o negativo, lo bloquea en Cuarentena.
+          <h4 style="font-size:1rem; color:#fff; margin-bottom:4px;">Ajustar Productos del Inventario en Tiempo Real</h4>
+          <p style="font-size:0.78rem; color:#cbd5e1; margin-bottom:10px; line-height:1.4;">
+            Selecciona cualquier bicicleta o producto del cat&aacute;logo para corregir t&iacute;tulo, precio, stock o retirarla a Cuarentena sin salir de la pantalla:
           </p>
 
-          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;">
-            <button type="button" class="btn-preset-ascend" data-sku="5319901" data-brand="TREK" data-desc="TRK TOP FUEL 9.8 XT GEN 4 M CARBON ROJO" data-cat="bicis" data-stock="2" data-price="115990" style="background:#2d3748; color:#ffb800; border:1px solid #4a5568; border-radius:6px; padding:4px 8px; font-size:0.71rem; cursor:pointer; font-weight:700;">
-              + Ej 1: Trek Top Fuel (Stock: 2)
-            </button>
-            <button type="button" class="btn-preset-ascend" data-sku="PD-M8100" data-brand="SHIMANO" data-desc="SHIM PEDALES DEORE XT PD-M8100 SPD XC" data-cat="partes" data-stock="6" data-price="2890" style="background:#2d3748; color:#38bdf8; border:1px solid #4a5568; border-radius:6px; padding:4px 8px; font-size:0.71rem; cursor:pointer; font-weight:700;">
-              + Ej 2: Pedales XT (Stock: 6)
-            </button>
-            <button type="button" class="btn-preset-ascend" data-sku="PPL-1" data-brand="PARK TOOL" data-desc="BOTE GRASA PARK TOOL POLYLUBE 1000 TUBO 113G" data-cat="partes" data-stock="4" data-price="450" style="background:#2d3748; color:#a7f3d0; border:1px solid #4a5568; border-radius:6px; padding:4px 8px; font-size:0.71rem; cursor:pointer; font-weight:700;">
-              + Ej 3: Bote Grasa Park Tool (Stock: 4)
-            </button>
-            <button type="button" class="btn-preset-ascend" data-sku="ERR-BONT-00" data-brand="BONTRAGER" data-desc="LLANTA BONTRAGER XR4 TEAM ISSUE 29X2.40" data-cat="partes" data-stock="-1" data-price="1490" style="background:#2d3748; color:#f87171; border:1px solid #4a5568; border-radius:6px; padding:4px 8px; font-size:0.71rem; cursor:pointer; font-weight:700;">
-              + Ej 4: Con Error (Stock: -1)
-            </button>
+          <!-- Selector de Producto Activo -->
+          <div style="margin-bottom:10px;">
+            <label style="font-size:0.72rem; color:#ffb800; display:block; margin-bottom:3px; font-weight:700;">Seleccionar Producto a Editar:</label>
+            <select id="agent-select-product" style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid #ff5500; background:#0f172a; color:#fff; font-size:0.82rem; font-weight:600;">
+              <option value="__NEW__">+ Dar de alta nuevo SKU manualmente</option>
+            </select>
           </div>
 
           <form id="form-ascend-live-agent">
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
               <div>
                 <label style="font-size:0.72rem; color:#94a3b8; display:block; margin-bottom:2px;">SKU Ascend RMS</label>
-                <input type="text" id="agent-input-sku" value="5319901" required style="width:100%; padding:7px 10px; border-radius:6px; border:1px solid #334155; background:#0f172a; color:#fff; font-size:0.82rem;">
+                <input type="text" id="agent-input-sku" value="" required style="width:100%; padding:7px 10px; border-radius:6px; border:1px solid #334155; background:#0f172a; color:#fff; font-size:0.82rem;">
               </div>
               <div>
                 <label style="font-size:0.72rem; color:#94a3b8; display:block; margin-bottom:2px;">Marca</label>
@@ -1238,8 +1231,33 @@
             </div>
 
             <div style="margin-bottom:8px;">
-              <label style="font-size:0.72rem; color:#94a3b8; display:block; margin-bottom:2px;">Descripci&oacute;n Corta en POS Ascend (Texto Crudo)</label>
-              <input type="text" id="agent-input-desc" value="TRK TOP FUEL 9.8 XT GEN 4 M CARBON ROJO" required style="width:100%; padding:7px 10px; border-radius:6px; border:1px solid #334155; background:#0f172a; color:#ffb800; font-family:monospace; font-size:0.82rem;">
+              <label style="font-size:0.72rem; color:#94a3b8; display:block; margin-bottom:2px;">Nombre Comercial / T&iacute;tulo en Tienda</label>
+              <input type="text" id="agent-input-desc" value="" required style="width:100%; padding:7px 10px; border-radius:6px; border:1px solid #334155; background:#0f172a; color:#ffb800; font-family:monospace; font-size:0.82rem;">
+            </div>
+
+            <!-- Editor de Fotografía en Vivo (URL o Carga Directa) -->
+            <div style="margin-bottom:10px; background:rgba(15,23,42,0.6); border:1px solid #334155; border-radius:8px; padding:10px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <label style="font-size:0.72rem; color:#94a3b8; font-weight:700;">Fotograf&iacute;a del Producto</label>
+                <span id="agent-img-status-pill" style="font-size:0.68rem; color:#10b981; font-family:monospace;">● Foto Activa</span>
+              </div>
+              <div style="display:flex; gap:10px; align-items:center;">
+                <div style="width:58px; height:58px; border-radius:6px; background:#1e293b; border:1px solid #475569; overflow:hidden; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                  <img id="agent-input-img-preview" src="assets/images/productos/5301924.jpg" alt="Preview" style="width:100%; height:100%; object-fit:contain;">
+                </div>
+                <div style="flex:1;">
+                  <input type="text" id="agent-input-img" placeholder="URL de la imagen o ruta..." style="width:100%; padding:6px 9px; border-radius:6px; border:1px solid #334155; background:#0f172a; color:#fff; font-size:0.76rem; margin-bottom:6px;">
+                  <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                    <label style="background:#334155; color:#f1f5f9; padding:4px 9px; border-radius:6px; font-size:0.7rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px; margin:0;">
+                      📷 Cambiar foto (Archivo)
+                      <input type="file" id="agent-input-file" accept="image/*" style="display:none;">
+                    </label>
+                    <button type="button" id="btn-search-brand-photo" style="background:#0284c7; color:#fff; border:none; padding:4px 9px; border-radius:6px; font-size:0.7rem; font-weight:700; cursor:pointer;" title="Buscar la foto oficial en Google / Trek en una pestaña nueva">
+                      🔍 Buscar foto oficial
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:12px;">
@@ -1254,18 +1272,23 @@
                 </select>
               </div>
               <div>
-                <label style="font-size:0.72rem; color:#94a3b8; display:block; margin-bottom:2px;">Existencia POS</label>
-                <input type="number" id="agent-input-stock" value="2" required style="width:100%; padding:7px 10px; border-radius:6px; border:1px solid #334155; background:#0f172a; color:#fff; font-size:0.82rem;">
+                <label style="font-size:0.72rem; color:#94a3b8; display:block; margin-bottom:2px;">Existencia Piso</label>
+                <input type="number" id="agent-input-stock" value="1" required style="width:100%; padding:7px 10px; border-radius:6px; border:1px solid #334155; background:#0f172a; color:#fff; font-size:0.82rem;">
               </div>
               <div>
                 <label style="font-size:0.72rem; color:#94a3b8; display:block; margin-bottom:2px;">Precio MXN</label>
-                <input type="number" id="agent-input-price" value="115990" required style="width:100%; padding:7px 10px; border-radius:6px; border:1px solid #334155; background:#0f172a; color:#fff; font-size:0.82rem;">
+                <input type="number" id="agent-input-price" value="0" required style="width:100%; padding:7px 10px; border-radius:6px; border:1px solid #334155; background:#0f172a; color:#fff; font-size:0.82rem;">
               </div>
             </div>
 
-            <button type="submit" class="btn-primary" style="width:100%; justify-content:center; padding:10px; font-size:0.85rem;">
-              Ejecutar Agente IA: Limpiar, Crear Ficha y Publicar
-            </button>
+            <div style="display:flex; gap:8px;">
+              <button type="submit" id="btn-save-product-changes" class="btn-primary" style="flex:1; justify-content:center; padding:9px; font-size:0.82rem;">
+                💾 Guardar Cambios en Tienda
+              </button>
+              <button type="button" id="btn-move-to-quarantine" style="background:#be123c; color:#fff; border:none; padding:9px 12px; border-radius:8px; font-size:0.76rem; font-weight:700; cursor:pointer;" title="Quita este producto de la tienda y lo envia a la Lista Roja">
+                🚫 Cuarentena
+              </button>
+            </div>
           </form>
 
           <div id="agent-live-log" style="margin-top:10px; background:#090d16; border:1px solid #334155; border-radius:6px; padding:10px; font-family:monospace; font-size:0.74rem; color:#10b981; min-height:66px; line-height:1.5;">
@@ -1293,8 +1316,21 @@
     </div>
   </div>
 
+  <!-- ==========================================================================
+       14. MODAL DE FICHA TÉCNICA DETALLADA & FOTO GRANDE (ESTILO E-COMMERCE)
+       ========================================================================== -->
+  <div class="modal-overlay-backdrop" id="product-detail-modal" style="z-index: 1050;">
+    <div class="clean-modal-box product-detail-modal-box">
+      <button type="button" class="btn-close-modal-clean" id="btn-close-product-detail" aria-label="Cerrar">&#10005;</button>
+      
+      <div class="product-detail-layout" id="product-detail-content">
+        <!-- Generado dinamicamente por main.js -->
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
-  <script src="js/ascend_sync_data.js?v=3.5"></script>
-  <script src="js/main.js?v=3.5"></script>
+  <script src="js/ascend_sync_data.js?v=3.7"></script>
+  <script src="js/main.js?v=4.3"></script>
 </body>
 </html>
