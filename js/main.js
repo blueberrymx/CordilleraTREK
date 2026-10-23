@@ -919,9 +919,37 @@ function initStore() {
   if (checkoutBtn) {
     checkoutBtn.addEventListener('click', () => {
       if (cart.length === 0) {
-        showToast('El carrito est\u00e1 vac\u00edo', 'error');
+        showToast('El carrito está vacío', 'error');
         return;
       }
+
+      // Validación estricta de existencias reales antes de abrir pasarela de pago
+      let hadAdjustment = false;
+      for (let i = cart.length - 1; i >= 0; i--) {
+        const item = cart[i];
+        const stock = getProductStock(item.id);
+        if (stock <= 0) {
+          cart.splice(i, 1);
+          hadAdjustment = true;
+          showToast(`"${item.title}" no cuenta con existencias en Coronado #1130 y fue retirado.`, 'error');
+        } else if (item.qty > stock) {
+          item.qty = stock;
+          hadAdjustment = true;
+          showToast(`Existencia insuficiente: "${item.title}" se ajustó a ${stock} unidad(es) (stock real).`, 'warning');
+        }
+      }
+
+      if (hadAdjustment) {
+        updateCartCounter();
+        renderCart();
+        return; // Detiene el checkout para que el cliente revise el pedido corregido
+      }
+
+      if (cart.length === 0) {
+        showToast('Los productos seleccionados ya no cuentan con stock disponible.', 'error');
+        return;
+      }
+
       closeCart();
       openCheckoutModal();
     });
@@ -1051,9 +1079,15 @@ function renderProducts(category, searchTerm) {
           <div>
             <div class="product-price-clean">$${p.price.toLocaleString('es-MX')} <span style="font-size:0.75rem; color:#64748b;">MXN</span></div>
           </div>
-          <button class="btn-add-minimal" onclick="event.stopPropagation(); addToCart('${p.id}')">
-            + A\u00f1adir
-          </button>
+          ${stockNum <= 0 ? `
+            <button class="btn-add-minimal" style="background:#f1f5f9; color:#94a3b8; border-color:#cbd5e1; cursor:not-allowed;" disabled onclick="event.stopPropagation()">
+              Agotado
+            </button>
+          ` : `
+            <button class="btn-add-minimal" onclick="event.stopPropagation(); addToCart('${p.id}')">
+              + Añadir
+            </button>
+          `}
         </div>
       </div>
     </div>
@@ -1322,10 +1356,16 @@ window.openProductDetail = function(productId) {
       <!-- Botones de Acción -->
       <div class="product-detail-actions">
         <div class="product-detail-btn-row">
-          <button type="button" class="btn-detail-add" onclick="addToCart('${prod.id}'); closeProductDetail();">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
-            <span>A\u00f1adir al Carrito</span>
-          </button>
+          ${stockNum <= 0 ? `
+            <button type="button" class="btn-detail-add" style="background:#cbd5e1; color:#64748b; cursor:not-allowed;" disabled>
+              <span>Agotado</span>
+            </button>
+          ` : `
+            <button type="button" class="btn-detail-add" onclick="addToCart('${prod.id}'); closeProductDetail();">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+              <span>Añadir al Carrito</span>
+            </button>
+          `}
 
           <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="btn-detail-whatsapp">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
@@ -1420,12 +1460,29 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// Función de consulta segura de stock en piso de venta
+function getProductStock(productId) {
+  const prod = PRODUCTS_DATA.find(p => p.id === productId || (p.sku && String(p.sku).toUpperCase() === String(productId).toUpperCase()));
+  if (!prod) return 0;
+  return typeof prod.stock === 'number' ? Math.max(0, prod.stock) : 1;
+}
+
 window.addToCart = function(productId) {
-  const prod = PRODUCTS_DATA.find(p => p.id === productId);
+  const prod = PRODUCTS_DATA.find(p => p.id === productId || (p.sku && String(p.sku).toUpperCase() === String(productId).toUpperCase()));
   if (!prod) return;
 
-  const existing = cart.find(item => item.id === productId);
+  const maxStock = getProductStock(prod.id);
+  if (maxStock <= 0) {
+    showToast(`"${prod.title}" está agotado en tienda Coronado.`, 'error');
+    return;
+  }
+
+  const existing = cart.find(item => item.id === prod.id);
   if (existing) {
+    if (existing.qty >= maxStock) {
+      showToast(`Existencia máxima alcanzada: solo hay ${maxStock} unidad(es) de "${prod.title}" en piso de tienda Coronado #1130.`, 'warning');
+      return;
+    }
     existing.qty += 1;
   } else {
     cart.push({
@@ -1434,13 +1491,14 @@ window.addToCart = function(productId) {
       price: prod.price,
       brand: prod.brand,
       img: prod.img,
-      variant: prod.variants[0],
+      variant: (prod.variants && prod.variants[0]) || 'Disponible en tienda',
       qty: 1
     });
   }
 
   updateCartCounter();
-  showToast('Agregado: ' + prod.title, 'success');
+  renderCart();
+  showToast(`Agregado al carrito (${existing ? existing.qty : 1}/${maxStock}): ${prod.title}`, 'success');
 };
 
 function updateCartCounter() {
@@ -1459,10 +1517,16 @@ function renderCart() {
 
   if (!cartList) return;
 
+  // Clampear preventivamente cantidades en caso de actualización de inventario
+  cart.forEach(item => {
+    const stock = getProductStock(item.id);
+    if (item.qty > stock) item.qty = Math.max(1, stock);
+  });
+
   if (cart.length === 0) {
     cartList.innerHTML = `
       <div style="text-align:center; padding:30px 10px; color:#64748b;">
-        <p>Tu carrito est\u00e1 vac\u00edo.</p>
+        <p>Tu carrito está vacío.</p>
       </div>
     `;
     if (subtotalEl) subtotalEl.textContent = '$0 MXN';
@@ -1471,21 +1535,32 @@ function renderCart() {
     return;
   }
 
-  cartList.innerHTML = cart.map((item, idx) => `
-    <div style="display:flex; gap:12px; padding:10px 0; border-bottom:1px solid #eee;">
-      <img src="${item.img}" alt="${item.title}" style="width:60px; height:60px; object-fit:cover; border-radius:6px;">
-      <div style="flex-grow:1;">
-        <h5 style="font-size:0.88rem; margin-bottom:2px;">${item.title}</h5>
-        <div style="font-size:0.85rem; font-weight:800; color:#181d26;">$${(item.price * item.qty).toLocaleString('es-MX')} MXN</div>
-        <div style="display:flex; align-items:center; gap:6px; margin-top:4px;">
-          <button style="width:22px; height:22px; cursor:pointer;" onclick="changeCartQty(${idx}, -1)">-</button>
-          <span style="font-size:0.82rem; font-weight:700;">${item.qty}</span>
-          <button style="width:22px; height:22px; cursor:pointer;" onclick="changeCartQty(${idx}, 1)">+</button>
-          <button style="background:none; border:none; color:#ef4444; font-size:0.75rem; margin-left:auto; cursor:pointer;" onclick="removeCartItem(${idx})">Quitar</button>
+  cartList.innerHTML = cart.map((item, idx) => {
+    const maxStock = getProductStock(item.id);
+    const isMaxReached = item.qty >= maxStock;
+    const stockBadge = maxStock <= 1
+      ? `<span style="font-size:0.68rem; color:#f59e0b; font-weight:800; background:rgba(245,158,11,0.12); padding:2px 6px; border-radius:4px; border:1px solid rgba(245,158,11,0.3);">¡Última pza en tienda Coronado!</span>`
+      : `<span style="font-size:0.68rem; color:#10b981; font-weight:700; background:rgba(16,185,129,0.1); padding:2px 6px; border-radius:4px; border:1px solid rgba(16,185,129,0.25);">Stock piso: ${maxStock} pzas</span>`;
+
+    return `
+      <div style="display:flex; gap:12px; padding:12px 0; border-bottom:1px solid #e2e8f0; align-items:flex-start;">
+        <img src="${item.img}" alt="${item.title}" style="width:62px; height:62px; object-fit:contain; border-radius:6px; background:#f8fafc; border:1px solid #e2e8f0; flex-shrink:0;">
+        <div style="flex-grow:1;">
+          <h5 style="font-size:0.86rem; line-height:1.25; margin:0 0 2px 0; color:#0f172a; font-weight:700;">${item.title}</h5>
+          <div style="display:flex; align-items:center; gap:8px; margin:3px 0 6px;">
+            <span style="font-size:0.85rem; font-weight:800; color:#181d26;">$${(item.price * item.qty).toLocaleString('es-MX')} MXN</span>
+            ${stockBadge}
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <button type="button" style="width:24px; height:24px; border:1px solid #cbd5e1; background:#fff; border-radius:4px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center;" onclick="changeCartQty(${idx}, -1)">-</button>
+            <span style="font-size:0.84rem; font-weight:800; min-width:20px; text-align:center;">${item.qty}</span>
+            <button type="button" style="width:24px; height:24px; border:1px solid #cbd5e1; background:${isMaxReached ? '#f1f5f9' : '#fff'}; color:${isMaxReached ? '#94a3b8' : '#0f172a'}; border-radius:4px; font-weight:700; cursor:${isMaxReached ? 'not-allowed' : 'pointer'}; display:flex; align-items:center; justify-content:center;" ${isMaxReached ? 'disabled title="Límite de stock disponible alcanzado"' : ''} onclick="changeCartQty(${idx}, 1)">+</button>
+            <button type="button" style="background:none; border:none; color:#ef4444; font-size:0.75rem; margin-left:auto; cursor:pointer; font-weight:600;" onclick="removeCartItem(${idx})">Quitar</button>
+          </div>
         </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
   const deliveryCost = deliveryMethod === 'local' ? (subtotal > 999 ? 0 : 80) : 190;
@@ -1499,10 +1574,24 @@ function renderCart() {
 }
 
 window.changeCartQty = function(idx, delta) {
-  if (cart[idx]) {
-    cart[idx].qty += delta;
-    if (cart[idx].qty <= 0) cart.splice(idx, 1);
+  const item = cart[idx];
+  if (!item) return;
+
+  const maxStock = getProductStock(item.id);
+
+  if (delta > 0) {
+    if (item.qty >= maxStock) {
+      showToast(`No puedes agregar más: solo hay ${maxStock} pieza(s) disponible(s) en tienda Coronado #1130.`, 'warning');
+      return;
+    }
+    item.qty += delta;
+  } else if (delta < 0) {
+    item.qty += delta;
+    if (item.qty <= 0) {
+      cart.splice(idx, 1);
+    }
   }
+
   updateCartCounter();
   renderCart();
 };
