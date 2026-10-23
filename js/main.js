@@ -2844,6 +2844,312 @@ function initAscendAgentConsole() {
     return result;
   }
 
+  // ==========================================================================
+  // FLUJO OPERATIVO EN 2 PASOS (GENERAR REPORTE -> SUBIR INVENTARIO APROBADO)
+  // ==========================================================================
+  const btnGenerateReport = document.getElementById('btn-generate-report');
+  const btnApplyApproved = document.getElementById('btn-apply-approved-inventory');
+  const fileSelectedBadge = document.getElementById('ascend-file-selected-badge');
+  const reportStatusBanner = document.getElementById('ascend-report-status-banner');
+
+  let loadedCSVBuffer = null;
+  let pendingAuditReport = null;
+
+  function setApprovedButtonState(enabled, count, isApplied) {
+    if (!btnApplyApproved) return;
+    if (isApplied) {
+      btnApplyApproved.disabled = true;
+      btnApplyApproved.style.background = '#065f46';
+      btnApplyApproved.style.color = '#a7f3d0';
+      btnApplyApproved.style.cursor = 'default';
+      btnApplyApproved.style.boxShadow = 'none';
+      btnApplyApproved.style.border = '1px solid #059669';
+      btnApplyApproved.innerHTML = '<span>✅ Inventario Aprobado Publicado en Tienda</span>';
+    } else if (enabled) {
+      btnApplyApproved.disabled = false;
+      btnApplyApproved.style.background = '#059669';
+      btnApplyApproved.style.color = '#ffffff';
+      btnApplyApproved.style.cursor = 'pointer';
+      btnApplyApproved.style.boxShadow = '0 4px 18px rgba(5, 150, 105, 0.45)';
+      btnApplyApproved.style.border = 'none';
+      btnApplyApproved.innerHTML = '<span>🚀 2. Subir Inventario Aprobado (' + (count || '') + ' Productos) a Tienda Web</span>';
+    } else {
+      btnApplyApproved.disabled = true;
+      btnApplyApproved.style.background = '#334155';
+      btnApplyApproved.style.color = '#94a3b8';
+      btnApplyApproved.style.cursor = 'not-allowed';
+      btnApplyApproved.style.boxShadow = 'none';
+      btnApplyApproved.style.border = '1px solid rgba(255,255,255,0.1)';
+      btnApplyApproved.innerHTML = '<span>🚀 2. Subir Inventario Aprobado a Tienda Web</span>';
+    }
+  }
+
+  function renderAuditKPIs(rawCount, cleanCount, quarCount, totalValue, totalUnits) {
+    const elRaw = document.getElementById('ascend-kpi-raw');
+    const elClean = document.getElementById('ascend-kpi-clean');
+    const elQuar = document.getElementById('ascend-kpi-quarantine');
+    const elVal = document.getElementById('ascend-kpi-value');
+    const elUnits = document.getElementById('ascend-kpi-units');
+
+    if (elRaw) elRaw.textContent = rawCount + ' SKUs';
+    if (elClean) elClean.textContent = cleanCount + ' SKUs';
+    if (elQuar) elQuar.textContent = quarCount + ' SKUs';
+    if (elVal) elVal.textContent = '$' + Math.round(totalValue).toLocaleString('es-MX') + ' MXN';
+    if (elUnits) elUnits.textContent = totalUnits + ' unidades listas en piso';
+  }
+
+  function buildDuranRealCSVText() {
+    let lines = ['ASCEND_SKU,UPC_BARCODE,BRAND,POS_SHORT_DESCRIPTION,ASCEND_DEPT,QTY_ON_HAND,PRICE_MXN,ECOMMERCE_FLAG,ULTIMO_VENDIDO,ULTIMO_RECIBIDO'];
+    realDuranProducts.forEach(p => {
+      lines.push([
+        p.sku || '',
+        p.upc || '',
+        p.brand || 'TREK',
+        '"' + (p.title || p.pos_raw || '').replace(/"/g, '""') + '"',
+        '"' + (p.ascend_category || p.category || '') + '"',
+        p.stock !== undefined ? p.stock : 1,
+        (p.price || 0).toFixed(2),
+        1,
+        '',
+        ''
+      ].join(','));
+    });
+    realDuranQuarantine.forEach(q => {
+      lines.push([
+        q.sku || '',
+        '',
+        q.brand || 'INTERNO',
+        '"' + (q.pos_desc || '').replace(/"/g, '""') + '"',
+        'Bicicletas - Cuarentena',
+        q.qty !== undefined ? q.qty : 0,
+        (q.price || 0).toFixed(2),
+        0,
+        '',
+        ''
+      ].join(','));
+    });
+    return lines.join('\n');
+  }
+
+  // Motor Universal de Análisis y Auditoría de CSV
+  function parseAnyAscendCSV(rawText, filename) {
+    if (!rawText) return null;
+    let cleanText = rawText;
+    if (cleanText.charCodeAt(0) === 0xFEFF) cleanText = cleanText.slice(1); // Limpiar BOM
+    const lines = cleanText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length < 2) return null;
+
+    const cleanItems = [];
+    const quarantineItems = [];
+    const seenSkus = new Set();
+
+    // 1. Detectar si proviene de un reporte de Convertio PDF
+    const isConvertioReport = (
+      cleanText.includes('Inventario por categoria') ||
+      cleanText.includes('Cantidad Subtotal') ||
+      cleanText.includes('Duran Go Trek SA de CV')
+    ) && !lines[0].toUpperCase().includes('ASCEND_SKU');
+
+    if (isConvertioReport) {
+      const reportItems = parseConvertioAscendReport(cleanText);
+      reportItems.forEach((it, idx) => {
+        const sku = it.sku;
+        const skuUpper = (sku || '').toUpperCase();
+        const brand = detectBrandFromText('', it.desc);
+
+        if (seenSkus.has(skuUpper)) {
+          quarantineItems.push({ sku, brand, pos_desc: it.desc + ' (' + it.cat + ')', qty: it.qty, price: it.price, motivo: 'SKU_DUPLICADO_EN_ASCEND' });
+          return;
+        }
+        seenSkus.add(skuUpper);
+
+        if (skuUpper === 'ARU7934082A' || it.price < 100) {
+          quarantineItems.push({ sku, brand: 'INTERNO', pos_desc: it.desc + ' (' + it.cat + ')', qty: it.qty, price: it.price, motivo: 'INTRUSO_EN_CATEGORIA_BICICLETAS_PRECIO_ATIPICO' });
+          return;
+        }
+        if (it.qty < 0) {
+          quarantineItems.push({ sku, brand, pos_desc: it.desc + ' (' + it.cat + ')', qty: it.qty, price: it.price, motivo: 'INVENTARIO_NEGATIVO_DESCUADRE_ALMACEN' });
+          return;
+        }
+        if (it.qty === 0 || isNaN(it.qty)) {
+          quarantineItems.push({ sku, brand, pos_desc: it.desc + ' (' + it.cat + ')', qty: 0, price: it.price, motivo: 'AGOTADO_EN_MOSTRADOR_STOCK_CERO' });
+          return;
+        }
+
+        const cat = detectCategoryFromText(it.desc, it.cat);
+        const photoUrl = resolveProductPhoto(sku, brand, it.desc, it.desc, cat);
+        const upcTxt = it.upc ? ('UPC ' + it.upc) : 'Catálogo Oficial';
+        const recTxt = it.lastRec ? ('Recibido: ' + it.lastRec) : 'Stock Piso Coronado #1130';
+
+        cleanItems.push({
+          id: 'duran-convertio-' + sku.toLowerCase().replace(/[^a-z0-9]/g, '') + '-' + idx,
+          sku: sku,
+          upc: it.upc,
+          category: cat,
+          ascend_category: it.cat,
+          brand: brand,
+          pos_raw: it.desc,
+          title: it.desc,
+          specs: it.cat + ' · ' + upcTxt + ' · ' + recTxt,
+          price: it.price,
+          stock: it.qty,
+          variants: [it.cat.replace('Bicicletas - ', '')],
+          img: photoUrl,
+          tag: 'Sync Duran Go Trek'
+        });
+      });
+    } else {
+      // 2. CSV estándar delimitado
+      const firstLine = lines[0];
+      const delimiter = firstLine.includes('\t') ? '\t' : (firstLine.split(';').length > firstLine.split(',').length ? ';' : ',');
+      const headers = parseCSVLine(firstLine, delimiter).map(h => h.toUpperCase().replace(/[^A-Z0-9_]/g, ''));
+
+      function findCol(patterns, fallbackIdx) {
+        for (let p of patterns) {
+          const idx = headers.findIndex(h => h.includes(p));
+          if (idx !== -1) return idx;
+        }
+        return fallbackIdx;
+      }
+
+      const idxSku = findCol(['SKU', 'PART', 'CODIGO', 'ID', 'ITEMNUMBER', 'ITEM_NUMBER', 'ITEM'], 0);
+      const idxUpc = findCol(['UPC', 'BARCODE'], -1);
+      const idxDesc = findCol(['DESC', 'NAME', 'NOMBRE', 'PRODUCT', 'ARTICULO', 'TITLE', 'DESCRIPCION'], 1);
+      const idxBrand = findCol(['BRAND', 'MARCA', 'VENDOR', 'MANUF', 'FABRICANTE'], -1);
+      const idxDept = findCol(['DEPT', 'CAT', 'DEPART', 'LINEA', 'TIPO', 'CATEGORIA'], -1);
+      const idxQty = findCol(['QTY', 'ONHAND', 'STOCK', 'EXIST', 'CANT', 'AVAIL', 'DISPON', 'EXISTENCIA'], 2);
+      const idxPrice = findCol(['PRICE', 'RETAIL', 'MSRP', 'PRECIO', 'VENTA', 'COST', 'PVP'], 3);
+      const idxEcom = findCol(['ECOM', 'WEB'], -1);
+
+      for (let i = 1; i < lines.length; i++) {
+        const cols = parseCSVLine(lines[i], delimiter);
+        if (cols.length < 2) continue;
+
+        const sku = (cols[idxSku] || ('ASC-' + i)).trim();
+        const skuUpper = sku.toUpperCase();
+        const upc = idxUpc >= 0 ? (cols[idxUpc] || '').trim() : '';
+        const rawDesc = (cols[idxDesc] || cols[1] || 'Producto Ascend #' + sku).trim();
+        const rawBrand = idxBrand >= 0 ? (cols[idxBrand] || '') : '';
+        const rawDept = idxDept >= 0 ? (cols[idxDept] || '') : '';
+        const brand = detectBrandFromText(rawBrand, rawDesc);
+        const qtyStr = (cols[idxQty] || '0').replace(/[^0-9.-]/g, '');
+        const priceStr = (cols[idxPrice] || '0').replace(/[^0-9.-]/g, '');
+        const qty = parseInt(qtyStr || '0', 10);
+        const price = parseFloat(priceStr || '0');
+        const ecomVal = idxEcom >= 0 ? (cols[idxEcom] || '1').trim().toUpperCase() : '1';
+        const upperDescDept = (rawDesc + ' ' + rawDept).toUpperCase();
+
+        if (seenSkus.has(skuUpper)) {
+          quarantineItems.push({ sku, brand, pos_desc: rawDesc, qty, price, motivo: 'SKU_DUPLICADO_EN_ASCEND' });
+          continue;
+        }
+        seenSkus.add(skuUpper);
+
+        if (skuUpper === 'ARU7934082A' || (upperDescDept.includes('BICICLETA') && price > 0 && price < 100)) {
+          quarantineItems.push({ sku, brand: 'INTERNO', pos_desc: rawDesc + (rawDept ? ' (' + rawDept + ')' : ''), qty, price, motivo: 'INTRUSO_EN_CATEGORIA_BICICLETAS_PRECIO_ATIPICO' });
+          continue;
+        }
+        if (ecomVal === '0' || ecomVal === 'FALSE' || ecomVal === 'NO' || upperDescDept.includes('TALLER INTERNO') || upperDescDept.includes('WORKSHOP-SUPPLY') || skuUpper === 'TALLER-GRASA') {
+          quarantineItems.push({ sku, brand, pos_desc: rawDesc, qty, price, motivo: 'INSUMO_INTERNO_TALLER_NO_PUBLICAR' });
+          continue;
+        }
+        if (qty < 0) {
+          quarantineItems.push({ sku, brand, pos_desc: rawDesc, qty, price, motivo: 'INVENTARIO_NEGATIVO_DESCUADRE_ALMACEN' });
+          continue;
+        }
+        if (qty === 0 || isNaN(qty)) {
+          quarantineItems.push({ sku, brand, pos_desc: rawDesc, qty: 0, price, motivo: 'AGOTADO_EN_MOSTRADOR_STOCK_CERO' });
+          continue;
+        }
+        if (price <= 0 || isNaN(price)) {
+          quarantineItems.push({ sku, brand, pos_desc: rawDesc, qty, price: 0, motivo: 'FALTA_CAPTURAR_PRECIO_EN_POS' });
+          continue;
+        }
+
+        const known = KNOWN_PRODUCT_KB[skuUpper];
+        const cat = known ? known.category : detectCategoryFromText(rawDesc, rawDept);
+        const cleanTitle = known ? known.title : enrichRawPosName(rawDesc);
+        const cleanSpecs = known ? known.specs : ((rawDept ? rawDept + ' · ' : '') + (upc ? 'UPC ' + upc + ' · ' : '') + 'SKU #' + sku + ' · Stock Coronado #1130');
+        const cleanVariants = (known && known.variants) ? known.variants : ['Disponible en Tienda Coronado'];
+        const photoUrl = resolveProductPhoto(sku, brand, cleanTitle, rawDesc, cat);
+
+        cleanItems.push({
+          id: 'ascend-csv-' + sku.toLowerCase().replace(/[^a-z0-9]/g, '') + '-' + i,
+          sku: sku,
+          upc: upc,
+          category: cat,
+          brand: brand,
+          pos_raw: rawDesc,
+          title: cleanTitle,
+          specs: cleanSpecs,
+          price: price,
+          stock: qty,
+          variants: cleanVariants,
+          img: photoUrl,
+          tag: (known && known.tag) ? known.tag : 'Sync Ascend'
+        });
+      }
+    }
+
+    const rawCount = cleanItems.length + quarantineItems.length;
+    const totalValue = cleanItems.reduce((acc, p) => acc + (p.price * (p.stock || 1)), 0);
+    const totalUnits = cleanItems.reduce((acc, p) => acc + (p.stock || 1), 0);
+
+    return {
+      rawCount,
+      clean: cleanItems,
+      quarantine: quarantineItems,
+      totalValue,
+      totalUnits
+    };
+  }
+
+  function runAuditAnalysis(sourceText, sourceName) {
+    const auditResult = parseAnyAscendCSV(sourceText, sourceName);
+    if (!auditResult || (auditResult.clean.length === 0 && auditResult.quarantine.length === 0)) {
+      showToast('No se detectaron productos válidos en el archivo', 'error');
+      if (logBox) {
+        logBox.style.color = '#f87171';
+        logBox.textContent = '[ERROR EN REPORTE] No se detectaron filas de inventario válidas en ' + sourceName;
+      }
+      return;
+    }
+
+    pendingAuditReport = auditResult;
+
+    // 1. Actualizar KPIs del reporte
+    renderAuditKPIs(auditResult.rawCount, auditResult.clean.length, auditResult.quarantine.length, auditResult.totalValue, auditResult.totalUnits);
+
+    // 2. Renderizar tabla de cuarentena de este reporte
+    quarantineList = [...auditResult.quarantine];
+    renderQuarantineList();
+
+    // 3. Actualizar consola de texto tipo terminal
+    if (logBox) {
+      logBox.style.color = '#10b981';
+      logBox.textContent = '[REPORTE DE AUDITORÍA GENERADO: ' + sourceName + '] ' +
+        'Leídos: ' + auditResult.rawCount + ' SKUs | ' +
+        'Aprobados para publicación: ' + auditResult.clean.length + ' ($' + Math.round(auditResult.totalValue).toLocaleString('es-MX') + ' MXN / ' + auditResult.totalUnits + ' unidades) | ' +
+        'Bloqueados en Cuarentena: ' + auditResult.quarantine.length + ' anomalías. ' +
+        'Presiona "2. Subir Inventario Aprobado a Tienda Web" para autorizar la publicación.';
+    }
+
+    // 4. Actualizar banner de estado
+    if (reportStatusBanner) {
+      reportStatusBanner.style.display = 'block';
+      reportStatusBanner.style.background = 'rgba(16, 185, 129, 0.15)';
+      reportStatusBanner.style.border = '1.5px solid #10b981';
+      reportStatusBanner.style.color = '#34d399';
+      reportStatusBanner.innerHTML = '📋 <strong>Reporte de Depuración Listo:</strong> Se auditaron <strong>' + auditResult.rawCount + ' SKUs</strong> en total &rarr; <strong>' + auditResult.clean.length + ' productos aprobados</strong> por un valor de <strong>$' + Math.round(auditResult.totalValue).toLocaleString('es-MX') + ' MXN</strong> y <strong>' + auditResult.quarantine.length + ' bloqueados en cuarentena</strong>. Ya puedes revisar la tabla y hacer clic en <strong>"2. Subir Inventario Aprobado a Tienda Web"</strong>.';
+    }
+
+    // 5. Habilitar Paso 2
+    setApprovedButtonState(true, auditResult.clean.length);
+
+    showToast('Reporte generado: ' + auditResult.clean.length + ' aprobados / ' + auditResult.quarantine.length + ' en cuarentena', 'success');
+  }
+
+  // Evento: Seleccionar archivo CSV
   if (csvFileInput) {
     csvFileInput.addEventListener('change', (e) => {
       const file = e.target.files && e.target.files[0];
@@ -2851,224 +3157,100 @@ function initAscendAgentConsole() {
 
       const reader = new FileReader();
       reader.onload = (evt) => {
-        const text = evt.target.result || '';
-        const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
-        if (lines.length < 2) {
-          showToast('El archivo CSV est\u00e1 vac\u00edo o no tiene filas', 'error');
-          return;
+        let text = evt.target.result || '';
+        if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+        loadedCSVBuffer = { name: file.name, text: text, size: file.size };
+
+        if (fileSelectedBadge) {
+          fileSelectedBadge.textContent = '📄 ' + file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)';
+          fileSelectedBadge.style.color = '#38bdf8';
+          fileSelectedBadge.style.borderColor = '#0284c7';
         }
 
-        const newClean = [];
-        const newQuarantine = [];
-        const seenSkus = new Set();
+        setApprovedButtonState(false);
 
-        // 1. Detectar si el archivo proviene de un reporte PDF de Ascend convertido en Convertio
-        const isConvertioReport = (
-          text.includes('Inventario por categoria') ||
-          text.includes('Cantidad Subtotal') ||
-          text.includes('Duran Go Trek SA de CV')
-        ) && !lines[0].includes('ASCEND_SKU');
-
-        if (isConvertioReport) {
-          const reportItems = parseConvertioAscendReport(text);
-          reportItems.forEach((it, idx) => {
-            const sku = it.sku;
-            const skuUpper = sku.toUpperCase();
-            const brand = detectBrandFromText('', it.desc);
-
-            if (seenSkus.has(skuUpper)) {
-              newQuarantine.push({ sku, brand, pos_desc: it.desc + ' (' + it.cat + ')', qty: it.qty, price: it.price, motivo: 'SKU_DUPLICADO_EN_ASCEND' });
-              return;
-            }
-            seenSkus.add(skuUpper);
-
-            if (skuUpper === 'ARU7934082A' || it.price < 100) {
-              newQuarantine.push({ sku, brand: 'INTERNO', pos_desc: it.desc + ' (' + it.cat + ')', qty: it.qty, price: it.price, motivo: 'INTRUSO_EN_CATEGORIA_BICICLETAS_PRECIO_ATIPICO' });
-              return;
-            }
-            if (it.qty < 0) {
-              newQuarantine.push({ sku, brand, pos_desc: it.desc + ' (' + it.cat + ')', qty: it.qty, price: it.price, motivo: 'INVENTARIO_NEGATIVO_DESCUADRE_ALMACEN' });
-              return;
-            }
-            if (it.qty === 0 || isNaN(it.qty)) {
-              newQuarantine.push({ sku, brand, pos_desc: it.desc + ' (' + it.cat + ')', qty: 0, price: it.price, motivo: 'AGOTADO_EN_MOSTRADOR_STOCK_CERO' });
-              return;
-            }
-
-            const cat = detectCategoryFromText(it.desc, it.cat);
-            const photoUrl = resolveProductPhoto(sku, brand, it.desc, it.desc, cat);
-            const upcTxt = it.upc ? ('UPC ' + it.upc) : 'Cat\u00e1logo Oficial';
-            const recTxt = it.lastRec ? ('Recibido: ' + it.lastRec) : 'Stock Piso Coronado #1130';
-
-            newClean.push({
-              id: 'duran-convertio-' + sku.toLowerCase().replace(/[^a-z0-9]/g, '') + '-' + idx,
-              sku: sku,
-              upc: it.upc,
-              category: cat,
-              ascend_category: it.cat,
-              brand: brand,
-              pos_raw: it.desc,
-              title: it.desc,
-              specs: it.cat + ' \u00b7 ' + upcTxt + ' \u00b7 ' + recTxt,
-              price: it.price,
-              stock: it.qty,
-              variants: [it.cat.replace('Bicicletas - ', '')],
-              img: photoUrl,
-              tag: 'Sync Duran Go Trek'
-            });
-          });
-        } else {
-          // 2. Lector de CSV estandar separado por comas, punto y coma o tabuladores
-          const firstLine = lines[0];
-          const delimiter = firstLine.includes('\t') ? '\t' : (firstLine.split(';').length > firstLine.split(',').length ? ';' : ',');
-          const headers = parseCSVLine(firstLine, delimiter).map(h => h.toUpperCase().replace(/[^A-Z0-9_]/g, ''));
-
-          function findCol(patterns, fallbackIdx) {
-            for (let p of patterns) {
-              const idx = headers.findIndex(h => h.includes(p));
-              if (idx !== -1) return idx;
-            }
-            return fallbackIdx;
-          }
-
-          const idxSku = findCol(['SKU', 'PART', 'CODIGO', 'ID', 'ITEMNUMBER'], 0);
-          const idxUpc = findCol(['UPC', 'BARCODE'], -1);
-          const idxDesc = findCol(['DESC', 'NAME', 'NOMBRE', 'PRODUCT', 'ARTICULO', 'TITLE'], 1);
-          const idxBrand = findCol(['BRAND', 'MARCA', 'VENDOR', 'MANUF', 'FABRICANTE'], -1);
-          const idxDept = findCol(['DEPT', 'CAT', 'DEPART', 'LINEA', 'TIPO'], -1);
-          const idxQty = findCol(['QTY', 'ONHAND', 'STOCK', 'EXIST', 'CANT', 'AVAIL', 'DISPON'], 2);
-          const idxPrice = findCol(['PRICE', 'RETAIL', 'MSRP', 'PRECIO', 'VENTA', 'COST', 'PVP'], 3);
-          const idxEcom = findCol(['ECOM', 'WEB'], -1);
-          const idxDiag = findCol(['DIAGNOSTICO', 'ACCION_RECOMENDADA', 'MOTIVO'], -1);
-
-          if (idxDiag !== -1) {
-            if (logBox) {
-              logBox.style.color = '#fbbf24';
-              logBox.textContent = '[AVISO] Subiste el archivo de "Lista Roja Almac\u00e9n" (que contiene s\u00f3lo los errores bloqueados). Para probar la carga completa del POS, haz clic en el bot\u00f3n azul "\ud83d\udcc4 Bajar CSV Limpio (62 SKUs)" o sube el archivo del inventario.';
-            }
-            showToast('Subiste la Lista Roja de Errores. Sube el archivo de Inventario.', 'important');
-            csvFileInput.value = '';
-            return;
-          }
-
-          for (let i = 1; i < lines.length; i++) {
-            const cols = parseCSVLine(lines[i], delimiter);
-            if (cols.length < 2) continue;
-
-            const sku = (cols[idxSku] || ('ASC-' + i)).trim();
-            const skuUpper = sku.toUpperCase();
-            const upc = idxUpc >= 0 ? (cols[idxUpc] || '').trim() : '';
-            const rawDesc = (cols[idxDesc] || cols[1] || 'Producto Ascend #' + sku).trim();
-            const rawBrand = idxBrand >= 0 ? (cols[idxBrand] || '') : '';
-            const rawDept = idxDept >= 0 ? (cols[idxDept] || '') : '';
-            const brand = detectBrandFromText(rawBrand, rawDesc);
-            const qtyStr = (cols[idxQty] || '0').replace(/[^0-9.-]/g, '');
-            const priceStr = (cols[idxPrice] || '0').replace(/[^0-9.-]/g, '');
-            const qty = parseInt(qtyStr || '0', 10);
-            const price = parseFloat(priceStr || '0');
-            const ecomVal = idxEcom >= 0 ? (cols[idxEcom] || '1').trim().toUpperCase() : '1';
-            const upperDescDept = (rawDesc + ' ' + rawDept).toUpperCase();
-
-            if (seenSkus.has(skuUpper)) {
-              newQuarantine.push({ sku, brand, pos_desc: rawDesc, qty, price, motivo: 'SKU_DUPLICADO_EN_ASCEND' });
-              continue;
-            }
-            seenSkus.add(skuUpper);
-
-            if (skuUpper === 'ARU7934082A' || (upperDescDept.includes('BICICLETA') && price > 0 && price < 100)) {
-              newQuarantine.push({ sku, brand: 'INTERNO', pos_desc: rawDesc + (rawDept ? ' (' + rawDept + ')' : ''), qty, price, motivo: 'INTRUSO_EN_CATEGORIA_BICICLETAS_PRECIO_ATIPICO' });
-              continue;
-            }
-            if (ecomVal === '0' || ecomVal === 'FALSE' || ecomVal === 'NO' || upperDescDept.includes('TALLER INTERNO') || upperDescDept.includes('WORKSHOP-SUPPLY') || skuUpper === 'TALLER-GRASA') {
-              newQuarantine.push({ sku, brand, pos_desc: rawDesc, qty, price, motivo: 'INSUMO_INTERNO_TALLER_NO_PUBLICAR' });
-              continue;
-            }
-            if (qty < 0) {
-              newQuarantine.push({ sku, brand, pos_desc: rawDesc, qty, price, motivo: 'INVENTARIO_NEGATIVO_DESCUADRE_ALMACEN' });
-              continue;
-            }
-            if (qty === 0 || isNaN(qty)) {
-              newQuarantine.push({ sku, brand, pos_desc: rawDesc, qty: 0, price, motivo: 'AGOTADO_EN_MOSTRADOR_STOCK_CERO' });
-              continue;
-            }
-            if (price <= 0 || isNaN(price)) {
-              newQuarantine.push({ sku, brand, pos_desc: rawDesc, qty, price: 0, motivo: 'FALTA_CAPTURAR_PRECIO_EN_POS' });
-              continue;
-            }
-
-            const known = KNOWN_PRODUCT_KB[skuUpper];
-            const cat = known ? known.category : detectCategoryFromText(rawDesc, rawDept);
-            const cleanTitle = known ? known.title : enrichRawPosName(rawDesc);
-            const cleanSpecs = known ? known.specs : ((rawDept ? rawDept + ' \u00b7 ' : '') + (upc ? 'UPC ' + upc + ' \u00b7 ' : '') + 'SKU #' + sku + ' \u00b7 Stock Coronado #1130');
-            const cleanVariants = (known && known.variants) ? known.variants : ['Disponible en Tienda Coronado'];
-            const photoUrl = customImg || resolveProductPhoto(sku, brand, cleanTitle, rawDesc, cat);
-
-            newClean.push({
-              id: 'ascend-csv-' + sku.toLowerCase().replace(/[^a-z0-9]/g, '') + '-' + i,
-              sku: sku,
-              upc: upc,
-              category: cat,
-              brand: brand,
-              pos_raw: rawDesc,
-              title: cleanTitle,
-              specs: cleanSpecs,
-              price: price,
-              stock: qty,
-              variants: cleanVariants,
-              img: photoUrl,
-              tag: (known && known.tag) ? known.tag : 'Sync Ascend'
-            });
-          }
+        if (reportStatusBanner) {
+          reportStatusBanner.style.display = 'block';
+          reportStatusBanner.style.background = 'rgba(56, 189, 248, 0.14)';
+          reportStatusBanner.style.border = '1px solid #0284c7';
+          reportStatusBanner.style.color = '#38bdf8';
+          reportStatusBanner.innerHTML = '📁 <strong>Archivo cargado en memoria:</strong> ' + file.name + '. Haz clic en el botón naranja <strong>"1. Generar Reporte de Depuración"</strong> para que el Agente IA analice los SKUs y separe la cuarentena.';
         }
 
-        if (newClean.length > 0 || newQuarantine.length > 0) {
-          // Reemplazar al 100% los productos anteriores para que NO se mezclen con el demo
-          PRODUCTS_DATA.length = 0;
-          newClean.forEach(p => PRODUCTS_DATA.push(p));
-          quarantineList = newQuarantine;
-
-          updateAscendKPIs();
-          renderQuarantineList();
-          renderProducts('all', '');
-
-
-          populateEditorDropdown();
-
-          const totalVal = newClean.reduce((acc, p) => acc + (p.price * (p.stock || 1)), 0);
-          if (logBox) {
-            logBox.style.color = '#10b981';
-            logBox.textContent = '[ARCHIVO REAL PROCESADO: ' + file.name + '] Le\u00eddos ' + (newClean.length + newQuarantine.length) + ' SKUs \u2192 ' + newClean.length + ' bicicletas/productos publicados ($' + Math.round(totalVal).toLocaleString('es-MX') + ' MXN) y ' + newQuarantine.length + ' anomal\u00edas bloqueadas en Cuarentena (cat\u00e1logo anterior reemplazado al 100%).';
-          }
-          showToast('Sincronizado: ' + newClean.length + ' publicados / ' + newQuarantine.length + ' en cuarentena', 'success');
-        } else {
-          if (logBox) {
-            logBox.style.color = '#f87171';
-            logBox.textContent = '[ERROR DE FORMATO] No se detectaron filas de inventario v\u00e1lidas en ' + file.name + '.';
-          }
-          showToast('No se encontraron productos v\u00e1lidos en el archivo', 'error');
+        if (logBox) {
+          logBox.style.color = '#38bdf8';
+          logBox.textContent = '[ARCHIVO LEÍDO: ' + file.name + ' (' + (file.size / 1024).toFixed(1) + ' KB)] Presiona "1. Generar Reporte de Depuración" para auditar los productos.';
         }
-        csvFileInput.value = '';
+        showToast('Archivo listo: ' + file.name + '. Haz clic en "1. Generar Reporte".', 'info');
       };
       reader.readAsText(file);
     });
   }
 
-  // Boton VERDE: Cargar directamente los 62 SKUs reales del reporte de Mario Arellano (Duran Go Trek SA de CV)
-  if (loadDuranRealBtn) {
-    loadDuranRealBtn.addEventListener('click', () => {
+  // Botón 1: Generar Reporte de Depuración
+  if (btnGenerateReport) {
+    btnGenerateReport.addEventListener('click', () => {
+      if (loadedCSVBuffer && loadedCSVBuffer.text) {
+        runAuditAnalysis(loadedCSVBuffer.text, loadedCSVBuffer.name);
+      } else {
+        const duranCSVText = buildDuranRealCSVText();
+        if (fileSelectedBadge) {
+          fileSelectedBadge.textContent = '🚴 Archivo Oficial Mario Arellano (62 SKUs)';
+          fileSelectedBadge.style.color = '#38bdf8';
+        }
+        runAuditAnalysis(duranCSVText, 'Inventario_Limpio_Duran_Go_Trek_62_SKUs.csv');
+      }
+    });
+  }
+
+  // Botón 2: Subir Inventario Aprobado a Tienda Web
+  if (btnApplyApproved) {
+    btnApplyApproved.addEventListener('click', () => {
+      if (!pendingAuditReport || !pendingAuditReport.clean || pendingAuditReport.clean.length === 0) {
+        showToast('Primero debes generar el reporte en el Paso 1', 'error');
+        return;
+      }
+
+      // Reemplazar al 100% los productos de la tienda con los aprobados
       PRODUCTS_DATA.length = 0;
-      realDuranProducts.forEach(p => PRODUCTS_DATA.push(p));
-      quarantineList = [...realDuranQuarantine];
+      pendingAuditReport.clean.forEach(p => PRODUCTS_DATA.push(p));
+      quarantineList = [...pendingAuditReport.quarantine];
+
+      renderProducts('all', '');
+      populateEditorDropdown();
       updateAscendKPIs();
       renderQuarantineList();
-      renderProducts('all', '');
 
+      setApprovedButtonState(false, 0, true);
+
+      if (reportStatusBanner) {
+        reportStatusBanner.style.display = 'block';
+        reportStatusBanner.style.background = 'rgba(5, 150, 105, 0.25)';
+        reportStatusBanner.style.border = '1.5px solid #10b981';
+        reportStatusBanner.style.color = '#ffffff';
+        reportStatusBanner.innerHTML = '✅ <strong>¡INVENTARIO APROBADO PUBLICADO CON ÉXITO!</strong> Se publicaron <strong>' + pendingAuditReport.clean.length + ' productos</strong> en la tienda web de Cordillera Trek ($' + Math.round(pendingAuditReport.totalValue).toLocaleString('es-MX') + ' MXN). Las <strong>' + pendingAuditReport.quarantine.length + ' anomalías</strong> quedaron protegidas en la Lista Roja de almacén.';
+      }
 
       if (logBox) {
         logBox.style.color = '#10b981';
-        logBox.textContent = '[INVENTARIO REAL MARIO ARELLANO ACTIVO] 62 SKUs de Duran Go Trek SA de CV (22/Oct/2026 11:32) \u2192 56 bicicletas publicadas ($1,726,833 MXN / 57 unidades) y 6 anomal\u00edas aisladas en Cuarentena (5 con stock -1 y 1 "Arugula" de $30).';
+        logBox.textContent = '[ORDEN EJECUTADA: TIENDA WEB ACTUALIZADA] ' + pendingAuditReport.clean.length + ' productos aprobados publicados en https://cordilleratrek.com ($' + Math.round(pendingAuditReport.totalValue).toLocaleString('es-MX') + ' MXN). Almacenista puede descargar la Lista Roja de ' + pendingAuditReport.quarantine.length + ' anomalías.';
       }
-      showToast('Cargado Inventario Real Duran Go Trek (56 publicados / 6 cuarentena)', 'success');
+
+      showToast('¡Éxito! ' + pendingAuditReport.clean.length + ' productos publicados en la tienda en línea', 'success');
+    });
+  }
+
+  // Preset: Cargar CSV Real de Mario Arellano
+  if (loadDuranRealBtn) {
+    loadDuranRealBtn.addEventListener('click', () => {
+      const duranCSVText = buildDuranRealCSVText();
+      loadedCSVBuffer = { name: 'Inventario_Limpio_Duran_Go_Trek_62_SKUs.csv', text: duranCSVText, size: duranCSVText.length };
+      if (fileSelectedBadge) {
+        fileSelectedBadge.textContent = '🚴 Reporte Oficial Duran Go Trek (62 SKUs)';
+        fileSelectedBadge.style.color = '#38bdf8';
+        fileSelectedBadge.style.borderColor = '#0284c7';
+      }
+      runAuditAnalysis(duranCSVText, 'Inventario_Limpio_Duran_Go_Trek_62_SKUs.csv');
     });
   }
 
