@@ -54,6 +54,7 @@
 html {
   scroll-padding-top: 76px;
   max-width: 100%;
+  overflow-x: clip;
 }
 
 section[id], footer[id], div[id] {
@@ -65,8 +66,9 @@ body {
   color: var(--color-text-dark);
   font-family: var(--font-main);
   line-height: 1.6;
-  overflow-x: hidden;
+  overflow-x: clip;
   max-width: 100%;
+  width: 100%;
   position: relative;
 }
 
@@ -252,7 +254,8 @@ button, input, select, textarea {
 #intro-screen {
   position: fixed;
   inset: 0;
-  width: 100vw;
+  width: 100%;
+  max-width: 100%;
   height: 100vh;
   background: #000000;
   z-index: 99999;
@@ -272,7 +275,8 @@ button, input, select, textarea {
 .intro-video-element, .intro-canvas-element {
   position: absolute;
   inset: 0;
-  width: 100vw;
+  width: 100%;
+  max-width: 100%;
   height: 100vh;
   object-fit: cover;
   opacity: 0.5;
@@ -439,10 +443,21 @@ button, input, select, textarea {
   position: sticky;
   top: 0;
   z-index: 1000;
-  background: rgba(16, 19, 25, 0.94);
+  background: rgba(16, 19, 25, 0.96);
   backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  transition: all var(--transition-fast);
+  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.main-header.is-fixed {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  box-shadow: 0 4px 22px rgba(0, 0, 0, 0.45) !important;
+  border-bottom: 1px solid rgba(255, 85, 0, 0.3) !important;
 }
 
 .header-inner {
@@ -1546,76 +1561,115 @@ button, input, select, textarea {
     border-radius: var(--radius-full);
   }
 
-  /* Sticky Header Mobile */
+  /* Sticky Header Mobile - Barra Grande, Firme y de Alto Contraste */
+  .main-header {
+    background: rgba(16, 19, 25, 0.98) !important;
+    box-shadow: 0 3px 16px rgba(0, 0, 0, 0.35);
+  }
+
   .header-inner {
-    padding: 8px 0;
-    gap: 6px;
-    justify-content: space-between;
+    padding: 11px 0 !important;
+    gap: 10px !important;
+    min-height: 60px !important;
+    justify-content: space-between !important;
   }
 
   .header-logos {
-    gap: 6px;
-    flex-shrink: 1;
-    min-width: 0;
+    gap: 8px !important;
+    flex-shrink: 1 !important;
+    min-width: 0 !important;
   }
 
   .header-logo-primary {
-    height: 22px;
-    max-width: 125px;
-    width: auto;
+    height: 33px !important;
+    max-width: 155px !important;
+    width: auto !important;
   }
 
   .header-logos-divider {
-    height: 14px;
-    margin: 0 1px;
-    flex-shrink: 0;
+    height: 22px !important;
+    margin: 0 2px !important;
+    flex-shrink: 0 !important;
+    background: rgba(255, 255, 255, 0.3) !important;
   }
 
   .header-logo-secondary {
-    height: 17px;
-    max-width: 55px;
-    width: auto;
-    flex-shrink: 0;
+    height: 25px !important;
+    max-width: 65px !important;
+    width: auto !important;
+    flex-shrink: 0 !important;
   }
 
   .header-actions {
-    gap: 6px;
-    flex-shrink: 0;
+    gap: 8px !important;
+    flex-shrink: 0 !important;
   }
 
   .btn-user-auth {
-    padding: 0;
-    width: 35px;
-    height: 35px;
-    min-width: 35px;
-    border-radius: 50%;
-    justify-content: center;
-    flex-shrink: 0;
+    padding: 0 !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    border-radius: 50% !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    border-color: rgba(255, 85, 0, 0.5) !important;
   }
 
   .btn-user-auth span {
-    display: none;
+    display: none !important;
   }
 
   .btn-cart-toggle {
-    width: 35px;
-    height: 35px;
-    min-width: 35px;
-    flex-shrink: 0;
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    flex-shrink: 0 !important;
+    border-radius: 50% !important;
+  }
+
+  .cart-counter {
+    width: 20px !important;
+    height: 20px !important;
+    font-size: 0.7rem !important;
+    top: -4px !important;
+    right: -4px !important;
   }
 
   .mobile-menu-btn {
-    width: 35px;
-    height: 35px;
-    min-width: 35px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    font-size: 1.15rem;
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    border-radius: 10px !important;
+    background: rgba(255, 255, 255, 0.14) !important;
+    border: 1.5px solid rgba(255, 255, 255, 0.3) !important;
+    font-size: 1.45rem !important;
     display: flex !important;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    cursor: pointer !important;
+  }
+
+  /* Prevenir desborde horizontal en seccion de tienda y parallas */
+  .parallax-section {
+    background-attachment: scroll !important;
+  }
+
+  #btn-open-ascend-console {
+    width: 100% !important;
+    max-width: 100% !important;
+    white-space: normal !important;
+    text-align: center !important;
+    justify-content: center !important;
+    padding: 9px 12px !important;
+    font-size: 0.77rem !important;
+    box-sizing: border-box !important;
+  }
+
+  .store-search-bar-wrap > div:first-child {
+    max-width: 100% !important;
+    width: 100% !important;
   }
 
   .footer-columns {
@@ -1628,38 +1682,56 @@ button, input, select, textarea {
     padding: 0 10px;
   }
 
+  .header-inner {
+    padding: 9px 0 !important;
+    gap: 6px !important;
+    min-height: 56px !important;
+  }
+
   .header-logos {
-    gap: 4px;
+    gap: 6px !important;
   }
 
   .header-logo-primary {
-    height: 20px;
-    max-width: 110px;
+    height: 28px !important;
+    max-width: 130px !important;
   }
 
   .header-logos-divider {
-    height: 12px;
-    margin: 0;
+    height: 18px !important;
+    margin: 0 1px !important;
   }
 
   .header-logo-secondary {
-    height: 15px;
-    max-width: 50px;
+    height: 22px !important;
+    max-width: 56px !important;
   }
 
   .header-actions {
-    gap: 4px;
+    gap: 6px !important;
   }
 
-  .btn-user-auth, .btn-cart-toggle, .mobile-menu-btn {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
-    font-size: 1rem;
+  .btn-user-auth {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+  }
+
+  .btn-cart-toggle {
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+  }
+
+  .mobile-menu-btn {
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    font-size: 1.25rem !important;
   }
 
   .top-notice-left {
-    font-size: 0.67rem;
+    font-size: 0.68rem !important;
   }
 }
 
@@ -2689,5 +2761,108 @@ button, input, select, textarea {
 
   .product-detail-btn-row {
     grid-template-columns: 1fr !important;
+  }
+}
+
+/* ==========================================================================
+   CARRUSEL MOVIL DE NOTICIAS & EVENTOS (SOLO MOVIL <= 768px)
+   Deslizamiento táctil horizontal nativo con scroll-snap y controles laterales
+   ========================================================================== */
+.news-carousel-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.news-mobile-controls {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .news-carousel-wrapper {
+    margin-top: 20px;
+    position: relative;
+    width: 100%;
+  }
+
+  .news-grid {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scroll-snap-type: x mandatory !important;
+    -webkit-overflow-scrolling: touch !important;
+    gap: 14px !important;
+    margin-top: 0 !important;
+    padding: 10px 4px 18px 4px !important;
+    scroll-behavior: smooth !important;
+    scrollbar-width: none !important;
+  }
+
+  .news-grid::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .news-card {
+    flex: 0 0 85% !important;
+    max-width: 320px !important;
+    min-width: 275px !important;
+    scroll-snap-align: center !important;
+    scroll-snap-stop: always !important;
+    margin-bottom: 0 !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
+    border-radius: 12px !important;
+  }
+
+  .news-mobile-controls {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 0 4px;
+  }
+
+  .btn-news-ctrl {
+    background: #181d26;
+    color: #f1f5f9;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    padding: 7px 14px;
+    border-radius: 20px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.2s ease;
+    user-select: none;
+  }
+
+  .btn-news-ctrl:hover, .btn-news-ctrl:active {
+    background: var(--color-orange);
+    color: #ffffff;
+    border-color: var(--color-orange);
+  }
+
+  .news-dots-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .news-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.25);
+    transition: all 0.25s ease;
+    cursor: pointer;
+  }
+
+  .news-dot.active {
+    width: 20px;
+    border-radius: 10px;
+    background: var(--color-orange);
   }
 }
