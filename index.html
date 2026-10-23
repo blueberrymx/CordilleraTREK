@@ -62,9 +62,6 @@
         <span>Tienda en l&iacute;nea, Env&iacute;os locales el mismo d&iacute;a en Durango &middot; Env&iacute;os asegurados a todo M&eacute;xico</span>
       </div>
       <div class="top-notice-right" style="display:flex; align-items:center; gap:14px;">
-        <a href="#intro" id="btn-reopen-intro" style="color:#b35300; font-weight:800; font-size:0.78rem; text-decoration:none;">
-          &#9654; Ver Video Intro
-        </a>
         <a href="https://wa.me/526188230673" target="_blank" class="top-whatsapp-link">
           WhatsApp: 618 823 0673
         </a>
@@ -473,7 +470,8 @@
         </div>
       </div>
 
-      <div class="news-grid">
+      <div class="news-carousel-wrapper">
+        <div class="news-grid" id="news-slider-track">
         <!-- Noticia / Flyer 1 -->
         <article class="news-card reveal-up delay-1" data-event-id="maraton-sierra" tabindex="0" role="button" aria-label="Ver detalles del Marat&oacute;n Sierra de Durango">
           <div class="news-card-media">
@@ -613,6 +611,27 @@
             </div>
           </div>
         </article>
+        </div>
+
+        <!-- Controles Móviles: Botones Deslizadores & Indicador de Noticias (Solo visible en celular) -->
+        <div class="news-mobile-controls" id="news-mobile-controls">
+          <button type="button" class="btn-news-ctrl btn-news-ctrl-prev" id="btn-news-ctrl-prev" aria-label="Noticia anterior">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+            <span>Anterior</span>
+          </button>
+
+          <div class="news-dots-indicator" id="news-dots-indicator">
+            <span class="news-dot active" data-idx="0" aria-label="Noticia 1"></span>
+            <span class="news-dot" data-idx="1" aria-label="Noticia 2"></span>
+            <span class="news-dot" data-idx="2" aria-label="Noticia 3"></span>
+            <span class="news-dot" data-idx="3" aria-label="Noticia 4"></span>
+          </div>
+
+          <button type="button" class="btn-news-ctrl btn-news-ctrl-next" id="btn-news-ctrl-next" aria-label="Siguiente noticia">
+            <span>Siguiente</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
       </div>
     </div>
   </section>
@@ -1331,6 +1350,6 @@
 
   <!-- Scripts -->
   <script src="js/ascend_sync_data.js?v=3.7"></script>
-  <script src="js/main.js?v=4.4"></script>
+  <script src="js/main.js?v=4.6"></script>
 </body>
 </html>
