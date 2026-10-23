@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initIntroScreen();
   initHeader();
   initSmoothScroll();
+  initNewsMobileCarousel();
   initCarousel();
   initScrollAnimations();
   initAuthSystem();
@@ -230,6 +231,34 @@ function initHeader() {
   const closeBtn = document.getElementById('mobile-nav-close');
   const drawerLinks = document.querySelectorAll('.mobile-nav-link');
   const drawerAuthBtn = document.querySelector('.mobile-nav-auth-btn');
+  const mainHeader = document.querySelector('.main-header');
+  const topNoticeBar = document.querySelector('.top-notice-bar');
+
+  // Respaldo de fijacion activa: asegura que la barra permanezca fija al hacer scroll en movil
+  if (mainHeader) {
+    let ticking = false;
+    const handleScrollLock = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          const threshold = topNoticeBar ? (topNoticeBar.offsetHeight || 36) : 36;
+          if (window.scrollY > threshold) {
+            mainHeader.classList.add('is-fixed');
+            if (window.innerWidth <= 768) {
+              document.body.style.paddingTop = mainHeader.offsetHeight + 'px';
+            }
+          } else {
+            mainHeader.classList.remove('is-fixed');
+            document.body.style.paddingTop = '';
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+    window.addEventListener('scroll', handleScrollLock, { passive: true });
+    window.addEventListener('resize', handleScrollLock, { passive: true });
+    handleScrollLock();
+  }
 
   function openDrawer() {
     if (drawer) drawer.classList.add('open');
@@ -3246,4 +3275,58 @@ function initAscendAgentConsole() {
       }, 250);
     });
   }
+}
+
+/* ==========================================================================
+   2.3 CARRUSEL MOVIL DE NOTICIAS (CONTROLES IZQ / DER & DOTS INDICADORES)
+   ========================================================================== */
+function initNewsMobileCarousel() {
+  const track = document.getElementById('news-slider-track') || document.querySelector('.news-grid');
+  const btnPrev = document.getElementById('btn-news-ctrl-prev');
+  const btnNext = document.getElementById('btn-news-ctrl-next');
+  const dots = document.querySelectorAll('.news-dot');
+  if (!track) return;
+
+  function getStep() {
+    const card = track.querySelector('.news-card');
+    return card ? (card.offsetWidth + 14) : 290;
+  }
+
+  if (btnPrev) {
+    btnPrev.addEventListener('click', (e) => {
+      e.preventDefault();
+      track.scrollBy({ left: -getStep(), behavior: 'smooth' });
+    });
+  }
+
+  if (btnNext) {
+    btnNext.addEventListener('click', (e) => {
+      e.preventDefault();
+      track.scrollBy({ left: getStep(), behavior: 'smooth' });
+    });
+  }
+
+  dots.forEach(dot => {
+    dot.addEventListener('click', () => {
+      const idx = parseInt(dot.getAttribute('data-idx') || '0', 10);
+      const step = getStep();
+      track.scrollTo({ left: idx * step, behavior: 'smooth' });
+    });
+  });
+
+  let throttle = false;
+  track.addEventListener('scroll', () => {
+    if (!throttle) {
+      throttle = true;
+      requestAnimationFrame(() => {
+        const step = getStep();
+        const activeIdx = Math.min(dots.length - 1, Math.max(0, Math.round(track.scrollLeft / step)));
+        dots.forEach((d, i) => {
+          if (i === activeIdx) d.classList.add('active');
+          else d.classList.remove('active');
+        });
+        throttle = false;
+      });
+    }
+  }, { passive: true });
 }
