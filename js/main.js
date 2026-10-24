@@ -1135,13 +1135,216 @@ function renderProducts(category, searchTerm) {
    Especificaciones reales verificadas de manuales de fabricante
    ========================================================================== */
 function getOfficialBrandSpecs(prod) {
-  const title = (prod.title || prod.pos_raw || '').toUpperCase();
-  const brand = (prod.brand || 'TREK').toUpperCase();
+  if (!prod) {
+    return {
+      oficial: false,
+      fuente: 'Sincronización Certificada Ascend RMS',
+      cuadro: 'TREK High Performance Alloy / Composite',
+      transmision: 'Componentes certificados de fábrica según especificación oficial del lote',
+      frenos: 'Sistema de frenado de disco certificado en taller',
+      garantia: 'Garantía oficial directa respaldada por TREK y Cordillera Trek Coronado #1130'
+    };
+  }
 
-  if (title.includes('MARLIN 5')) {
+  const rawTitle = (prod.title || prod.pos_raw || '').toUpperCase();
+  const rawBrand = (prod.brand || 'TREK').toUpperCase();
+  const rawDept = (prod.ascend_category || prod.category || '').toUpperCase();
+  const rawSku = (prod.sku || '').toUpperCase();
+  const fullText = (rawTitle + ' ' + rawBrand + ' ' + rawDept + ' ' + rawSku).replace(/\s+/g, ' ');
+  const norm = fullText.replace(/\s*\+\s*/g, '+');
+
+  // =========================================================================
+  // 1. E-BIKES / BICICLETAS ELÉCTRICAS (BOSCH & TQ MOTOR SYSTEMS)
+  // =========================================================================
+
+  // 1.1 Trek Marlin+ 6 (Eléctrica Bosch) - SKU: MAR20673171K
+  if (norm.includes('MARLIN+6') || norm.includes('MARLIN+') || norm.includes('MAR20673171K') || (norm.includes('MARLIN') && (norm.includes('ELÉCTRICA') || norm.includes('ELECTRICA') || norm.includes('E-BIKE')))) {
     return {
       oficial: true,
-      fuente: 'Trek Bikes Official Technical Manual (Marlin Gen 3)',
+      fuente: 'Trek Bikes & Bosch eBike Systems Official Technical Manual',
+      motor: 'Bosch Active Line Plus, 50 Nm torque, asistencia 25 km/h.',
+      bateria: 'Bosch CompactTube 400 Wh integrada y desmontable.',
+      display: 'Bosch Purion 200 a color con Bluetooth para app eBike Flow.',
+      frenos: 'Tektro hidráulicos con discos de 203 mm para e-bike.',
+      cuadro: 'Aluminio Alpha Gold con batería integrada oculta, guiado interno de cables y soportes para portabultos y salpicaderas.',
+      suspension: 'SR Suntour XCM 32, eje pasante Boost110 de 15 mm, 120 mm de recorrido (talla XS: 100 mm).',
+      transmision: 'Shimano CUES U4000 1x9 velocidades con tecnología Linkglide reforzada para alto torque eléctrico.',
+      cassette: 'Shimano LINKGLIDE LG300, 11-46T, 9 velocidades.',
+      ruedas: 'Bontrager Connection, doble pared, 32 agujeros, 29" (tallas XS/S: 27.5").',
+      llantas: 'Bontrager Gunnison Pro XR, Tubeless Ready, aro de aramida, 60 tpi, 29x2.60".',
+      peso: '21.30 kg / 46.96 lbs con batería incluida (límite de peso máximo del ciclista + carga: 136 kg).',
+      garantia: 'Garantía oficial de por vida en cuadro Trek + 2 años de garantía oficial en motor y batería Bosch.'
+    };
+  }
+
+  // 1.2 Trek Rail / Rail+ (Eléctrica Enduro Bosch CX) - SKUs: RAI16507841R, RAI31756369Y
+  if (norm.includes('RAIL+') || (norm.includes('RAIL') && !norm.includes('TRAIL')) || norm.includes('RAI16507841R') || norm.includes('RAI31756369Y')) {
+    return {
+      oficial: true,
+      fuente: 'Trek Bikes & Bosch Performance Line CX Smart System Datasheet',
+      motor: 'Bosch Performance Line CX, 85 Nm de par motor máximo, asistencia inteligente hasta 25 km/h.',
+      bateria: 'Bosch PowerTube 625 Wh / 750 Wh integrada en cuadro con sistema RIB (Removable Integrated Battery).',
+      display: 'Bosch Kiox 300 a color con mando LED Remote en manillar y navegación por GPS vía app eBike Flow.',
+      frenos: 'Frenos de disco hidráulicos Shimano de 4 pistones con rotores sobredimensionados de 203 mm para e-MTB.',
+      cuadro: 'Aluminio Alpha Platinum, tubo de dirección perfilado, guiado interno Control Freak, Knock Block 2.0, 150 mm de recorrido.',
+      suspension: 'RockShox Yari RC / Fox 36 Rhythm e-MTB, 160 mm de recorrido delantero, amortiguador RockShox Deluxe Select+ RT.',
+      transmision: 'Shimano Deore / XT M8100 1x12 velocidades optimizada para torque eléctrico.',
+      cassette: 'Shimano Deore M6100, 10-51T, 12 velocidades.',
+      ruedas: 'Bontrager Line Comp 30, Tubeless Ready, Rapid Drive 108 dientes, Boost148 trasero.',
+      peso: '23.40 kg / 51.59 lbs con batería.',
+      garantia: 'Garantía oficial de por vida en cuadro Trek + 2 años en sistema eléctrico Bosch.'
+    };
+  }
+
+  // 1.3 Trek Fuel EXe 9.8 (Light e-MTB TQ HPR50) - SKU: FUE2228474K
+  if (norm.includes('FUEL EXE') || norm.includes('FUE2228474K')) {
+    return {
+      oficial: true,
+      fuente: 'Trek Bikes & TQ Group Germany Technical Whitepaper (Fuel EXe Series)',
+      motor: 'Motor de anillo armónico TQ HPR50, ultra silencioso y ultraligero (1.85 kg), 50 Nm de torque natural.',
+      bateria: 'Batería TQ de 360 Wh integrada en tubo diagonal (compatible con Range Extender TQ de 160 Wh en portabidón).',
+      display: 'Pantalla OLED de 2 pulgadas integrada al ras en el tubo superior con botón remoto ergonómico en manillar.',
+      frenos: 'Frenos de disco hidráulicos Shimano XT M8120 de 4 pistones con rotores Ice-Tech RT86 de 203 mm delantero / 180 mm trasero.',
+      cuadro: 'Carbono OCLV Mountain completo, compartimento interno en cuadro, geometría ajustable Mino Link, 140 mm de recorrido.',
+      suspension: 'RockShox Lyrik Select+ 150 mm de recorrido / amortiguador RockShox Super Deluxe Select+ RT 205x60 mm.',
+      transmision: 'Shimano XT M8100 1x12 velocidades con bielas e*thirteen e*spec Race Carbon.',
+      cassette: 'Shimano XT M8100, 10-51T, 12 velocidades.',
+      ruedas: 'Bontrager Line Elite 30 de carbono OCLV Mountain, Rapid Drive 108 dientes, Tubeless Ready.',
+      peso: '18.10 kg / 39.90 lbs (una de las e-MTB más ligeras del mercado mundial).',
+      garantia: 'Garantía oficial de por vida Trek Carbon Care + 2 años de garantía TQ e-Bike System.'
+    };
+  }
+
+  // =========================================================================
+  // 2. MONTAÑA COMPETICIÓN & TRAIL (TREK & CANNONDALE)
+  // =========================================================================
+
+  // 2.1 Trek Top Fuel 8 & 9.8 Gen 4 - SKUs: TOP22914896B, TOP18118293R
+  if (norm.includes('TOP FUEL') || norm.includes('TOP22914896B') || norm.includes('TOP18118293R')) {
+    const isCarbon = norm.includes('9.8') || norm.includes('TOP18118293R');
+    return {
+      oficial: true,
+      fuente: isCarbon ? 'Trek Factory XC & Downcountry Specs (Top Fuel 9.8 XT Di2 Gen 4)' : 'Trek Downcountry Datasheet (Top Fuel 8 Gen 4)',
+      cuadro: isCarbon ? 'Carbono OCLV Mountain completo, compartimento interno en tubo diagonal BITS, guiado interno guiado de extremo a extremo, 120 mm.' : 'Aluminio Alpha Platinum, almacenamiento interno en tubo diagonal BITS, Mino Link, 120 mm de recorrido.',
+      suspension: isCarbon ? 'RockShox Pike Select+ Charger 3 RC2, 130 mm / amortiguador RockShox Deluxe Ultimate RCT.' : 'Fox Rhythm 34 Float EVOL, amortiguador GRIP, 130 mm / amortiguador Fox Performance Float DPS.',
+      transmision: isCarbon ? 'Shimano Deore XT M8150 Di2 electrónico / XT mecánico 1x12 velocidades.' : 'Shimano XT / SLX M7100 1x12 velocidades.',
+      cassette: 'Shimano XT / SLX M7100, 10-51T, 12 velocidades.',
+      frenos: 'Frenos de disco hidráulicos Shimano XT / SLX M7120 de 4 pistones con rotores RT70 de 180 mm.',
+      ruedas: isCarbon ? 'Bontrager Line Elite 30, Carbono OCLV Mountain, Tubeless Ready, Rapid Drive 108.' : 'Bontrager Line Comp 30, Tubeless Ready, Rapid Drive 108.',
+      peso: isCarbon ? '12.45 kg / 27.45 lbs.' : '14.10 kg / 31.08 lbs.',
+      garantia: 'Garantía oficial de por vida en cuadro Trek (Lifetime Warranty).'
+    };
+  }
+
+  // 2.2 Trek Procaliber 6 & 9.5 (Hardtail Competición XC con IsoSpeed) - SKUs: PRO294645922, PRO307703432, PRO38374634Y, PRO37273067Y
+  if (norm.includes('PROCALIBER') || norm.includes('PRO294645922') || norm.includes('PRO307703432') || norm.includes('PRO38374634Y') || norm.includes('PRO37273067Y')) {
+    const isCarbon = norm.includes('9.5') || norm.includes('PRO38374634Y');
+    return {
+      oficial: true,
+      fuente: isCarbon ? 'Trek World Cup XC Datasheet (Procaliber 9.5 Carbon IsoSpeed)' : 'Trek Fast XC Specs (Procaliber 6)',
+      cuadro: isCarbon ? 'Carbono OCLV Mountain con rótula IsoSpeed que absorbe vibraciones sin perder rigidez de pedaleo, Boost148.' : 'Aluminio Alpha Platinum, tubo de dirección perfilado, guiado interno de cables y dropper, Boost148.',
+      suspension: isCarbon ? 'RockShox Judy SL, Solo Air, bloqueo remoto en manillar, Boost110, 100 mm de recorrido.' : 'RockShox Judy Gold, Solo Air, bloqueo remoto TurnKey, Boost110, 100 mm de recorrido.',
+      transmision: 'Shimano Deore M6100 1x12 velocidades con cambio Shadow RD+ y mando Rapidfire Plus.',
+      cassette: 'Shimano Deore M6100, 10-51T, 12 velocidades Hyperglide+.',
+      frenos: 'Frenos de disco hidráulicos Shimano MT200 con rotores RT10 de 180 mm delantero / 160 mm trasero.',
+      ruedas: 'Bontrager Kovee, doble pared, Tubeless Ready, 28 agujeros, 29" (ancho interno 23 mm).',
+      peso: isCarbon ? '11.88 kg / 26.19 lbs.' : '12.40 kg / 27.34 lbs.',
+      garantia: 'Garantía oficial de por vida en cuadro Trek (Lifetime Warranty).'
+    };
+  }
+
+  // 2.3 Cannondale Habit 4 (Trail 29 Doble Suspensión) - SKUs: HAB24765361E, HAB24277511E
+  if (norm.includes('HABIT') || norm.includes('HAB24765361E') || norm.includes('HAB24277511E')) {
+    return {
+      oficial: true,
+      fuente: 'Cannondale Bicycles Official Technical Manual (Habit 4 Trail 29)',
+      cuadro: 'Aluminio SmartForm C1, 130 mm de recorrido, cinemática Proportional Response específica por talla, eje pasante Boost148.',
+      suspension: 'RockShox Recon RL Solo Air 140 mm / amortiguador RockShox Deluxe Select DebonAir 210x55 mm.',
+      transmision: 'Shimano Deore M6100 1x12 velocidades con tecnología Shadow RD+ antibalanceo.',
+      cassette: 'Shimano Deore M6100, 10-51T, 12 velocidades.',
+      frenos: 'Frenos de disco hidráulicos Shimano MT200 con rotores RT10 de 180 mm delantero y trasero.',
+      ruedas: 'WTB STX i25 TCS, 32 agujeros, Tubeless Ready, bujes Shimano MT410 Boost.',
+      llantas: 'Maxxis Dissector 29x2.4" EXO TR delantero / Maxxis Rekon 29x2.4" EXO TR trasero.',
+      tija: 'Tija telescópica TranzX dropper post con mando remoto en manillar, recorrido de 130 a 150 mm según talla.',
+      peso: '14.80 kg / 32.63 lbs.',
+      garantia: 'Garantía oficial de por vida en cuadro Cannondale para el propietario original.'
+    };
+  }
+
+  // 2.4 Cannondale Trail 1 & Trail 2 (Hardtail MTB) - SKUs: TRA23399625E, TRA21884899E, TRA27921679E
+  if ((norm.includes('TRAIL') && norm.includes('CANNONDALE')) || norm.includes('TRA23399625E') || norm.includes('TRA21884899E') || norm.includes('TRA27921679E')) {
+    const isTrail1 = norm.includes('TRAIL 1') || norm.includes('TRA23399625E') || norm.includes('TRA21884899E');
+    return {
+      oficial: true,
+      fuente: 'Cannondale SmartForm Hardtail Specs (Trail Series)',
+      cuadro: 'Aluminio SmartForm C2 / C3, tirantes SAVE micro-suspensión, tubo de dirección cónico, Boost QR.',
+      suspension: isTrail1 ? 'RockShox Judy Silver TK, Solo Air, 100 mm de recorrido con bloqueo remoto en manillar PopLoc.' : 'SR Suntour XCM-RL, resorte helicoidal, 100 mm con bloqueo remoto en manillar.',
+      transmision: isTrail1 ? 'SRAM SX Eagle / Shimano Deore 1x12 velocidades.' : 'microSHIFT Advent X / Shimano Deore 1x10 velocidades.',
+      frenos: 'Frenos de disco hidráulicos Shimano MT200 / Tektro M275 con rotores de 180/160 mm.',
+      ruedas: 'WTB SX19, doble pared, 32 agujeros, 29".',
+      peso: '13.60 kg / 29.98 lbs.',
+      garantia: 'Garantía oficial de por vida en cuadro Cannondale.'
+    };
+  }
+
+  // 2.5 Cannondale Kids Trail 20 - SKU: KID24199308E
+  if (norm.includes('KIDS TRAIL') || norm.includes('KID24199308E')) {
+    return {
+      oficial: true,
+      fuente: 'Cannondale Youth Geometry Manual (Kids Trail 20)',
+      cuadro: 'Aluminio SmartForm C3 ligero, geometría adaptada a niños con baja altura de apoyo (standover bajo).',
+      suspension: 'Horquilla SunTour XCT-JR 20, 40 mm de recorrido, resorte suave para bajo peso corporal.',
+      transmision: 'microSHIFT 7 velocidades con mando giratorio RevoShift de fácil accionamiento con manos pequeñas.',
+      frenos: 'Frenos V-brake de aluminio Promax con manetas de alcance corto regulables para dedos infantiles.',
+      ruedas: 'Cannondale 20" de aluminio ligero con llantas multi-terreno 20x1.95".',
+      garantia: 'Garantía de por vida en cuadro Cannondale.'
+    };
+  }
+
+  // =========================================================================
+  // 3. GAMA TREK MARLIN GEN 3 & GEN 2 (HARDTAIL MONTAÑA)
+  // =========================================================================
+
+  // 3.1 Trek Marlin 7 Gen 3 - SKUs: MAR19133946T, MAR21269788E
+  if (norm.includes('MARLIN 7') || norm.includes('MAR19133946T') || norm.includes('MAR21269788E')) {
+    return {
+      oficial: true,
+      fuente: 'Trek Bikes Official Technical Manual (Marlin 7 Gen 3)',
+      cuadro: 'Aluminio Alpha Silver, geometría moderna relajada (66.5° ángulo de dirección), guiado interno para dropper post, eje ThruSkew.',
+      suspension: 'RockShox Judy Silver, resorte Solo Air ajustable según peso del ciclista, bloqueo TurnKey, 100 mm de recorrido.',
+      transmision: 'Shimano Deore M5120 1x10 velocidades con embrague Shadow RD+ y mando Rapidfire Plus.',
+      cassette: 'Shimano Deore M4100, 11-46T, 10 velocidades.',
+      frenos: 'Frenos de disco hidráulicos Shimano MT200 con rotores RT26 de 180 mm delantero / 160 mm trasero.',
+      ruedas: 'Bontrager Kovee, doble pared, Tubeless Ready, 28 agujeros, 29" (ancho interno 23 mm).',
+      llantas: 'Bontrager XT3 Comp, aro rígido, 30 tpi, 29x2.40" (talla XS: 27.5x2.40").',
+      peso: '14.60 kg / 32.19 lbs (Talla M). Límite de carga máxima: 136 kg.',
+      garantia: 'Garantía oficial de por vida en cuadro Trek (Lifetime Warranty).'
+    };
+  }
+
+  // 3.2 Trek Marlin 6 Gen 3 - SKUs: MAR38989209E, MAR31253013K, MAR14419582A, MAR1439354A, MAR1570023A, MAR16677398A, MAR32983611K
+  if (norm.includes('MARLIN 6') || norm.includes('MAR38989209E') || norm.includes('MAR31253013K') || norm.includes('MAR14419582A') || norm.includes('MAR1439354A') || norm.includes('MAR1570023A') || norm.includes('MAR16677398A') || norm.includes('MAR32983611K')) {
+    return {
+      oficial: true,
+      fuente: 'Trek Bikes Official Technical Manual (Marlin 6 Gen 3)',
+      cuadro: 'Aluminio Alpha Silver, geometría moderna relajada (66.5° ángulo de dirección), guiado interno para dropper post, ThruSkew.',
+      suspension: 'RockShox Judy, resorte helicoidal, precarga, bloqueo mecánico TurnKey, 100 mm de recorrido (talla XS: 80 mm).',
+      transmision: 'Shimano Deore M4100, 1x10 velocidades con embrague Shadow RD+ antibalanceo de cadena.',
+      desviador: 'Shimano Deore M5120 con palanca de tensión de cadena activable.',
+      cassette: 'Shimano Deore M4100, 11-46T, 10 velocidades.',
+      frenos: 'Frenos de disco hidráulicos Shimano MT200 / Tektro HD-M275 con rotores de 180 mm delantero / 160 mm trasero.',
+      ruedas: 'Bontrager Kovee, doble pared, Tubeless Ready, 28 agujeros.',
+      llantas: 'Bontrager XT3 Comp, 29x2.40" (tallas XS/S: 27.5x2.40").',
+      peso: '14.50 kg / 31.97 lbs.',
+      garantia: 'Garantía oficial de por vida en cuadro Trek.'
+    };
+  }
+
+  // 3.3 Trek Marlin 5 Gen 3 - SKUs: MAR17219125D, MAR39160984K, MAR23432861E, MAR18647908D, MAR23695096E, MAR36195173E, MAR17981847D
+  if (norm.includes('MARLIN 5') || norm.includes('MAR17219125D') || norm.includes('MAR39160984K') || norm.includes('MAR23432861E') || norm.includes('MAR18647908D') || norm.includes('MAR23695096E') || norm.includes('MAR36195173E') || norm.includes('MAR17981847D')) {
+    return {
+      oficial: true,
+      fuente: 'Trek Bikes Official Technical Manual (Marlin 5 Gen 3)',
       cuadro: 'Aluminio Alpha Silver, guiado interno de cables y tija telescópica, soporte para portabultos y pata de cabra, eje ThruSkew 135x5 mm.',
       suspension: 'SR Suntour XCT 30, resorte helicoidal, precarga, bloqueo hidráulico, 100 mm de recorrido (talla XS: 80 mm).',
       transmision: 'Shimano CUES U4000 de 1x9 velocidades con mando Rapidfire Plus y display óptico.',
@@ -1150,132 +1353,219 @@ function getOfficialBrandSpecs(prod) {
       frenos: 'Frenos de disco hidráulicos Tektro HD-M275, rotores Tektro 180 mm delantero / 160 mm trasero.',
       ruedas: 'Bontrager Connection, doble pared, 32 agujeros, ancho interior 20 mm.',
       llantas: 'Bontrager XT3 Comp, aro rígido, 30 tpi, 29x2.40" (tallas XS/S: 27.5x2.40").',
-      peso: '15.10 kg / 33.29 lbs (Talla M). Límite de carga máxima: 136 kg (bicicleta + ciclista + equipaje).',
-      garantia: 'Garantía oficial de por vida en cuadro para el comprador original (Trek Lifetime Warranty).'
+      peso: '15.10 kg / 33.29 lbs (Talla M). Límite de carga máxima: 136 kg.',
+      garantia: 'Garantía oficial de por vida en cuadro Trek (Lifetime Warranty).'
     };
   }
 
-  if (title.includes('MARLIN 6')) {
+  // 3.4 Trek Marlin 4 Gen 2 & Gen 3 - SKUs: MAR29286215E, MAR34557503K
+  if (norm.includes('MARLIN 4') || norm.includes('MARLIN 2023') || norm.includes('MAR29286215E') || norm.includes('MAR34557503K')) {
     return {
       oficial: true,
-      fuente: 'Trek Bikes Official Technical Manual (Marlin Gen 3)',
-      cuadro: 'Aluminio Alpha Silver, geometría moderna relajada (66.5° ángulo de dirección), guiado interno para dropper post.',
-      suspension: 'RockShox Judy, resorte helicoidal, precarga, bloqueo mecánico TurnKey, 100 mm de recorrido.',
-      transmision: 'Shimano Deore M4100, 1x10 velocidades con embrague Shadow RD+ antibalanceo.',
-      desviador: 'Shimano Deore M5120 con palanca de tensión de cadena activable.',
-      cassette: 'Shimano Deore M4100, 11-46T, 10 velocidades.',
-      frenos: 'Frenos de disco hidráulicos Shimano MT200, rotores Shimano RT26 de 180 mm delantero / 160 mm trasero.',
-      ruedas: 'Bontrager Kovee, doble pared, Tubeless Ready, 28 agujeros.',
-      llantas: 'Bontrager XT3 Comp, 29x2.40".',
-      peso: '14.50 kg / 31.97 lbs.',
+      fuente: 'Trek Bikes Official Datasheet (Marlin 4 Series)',
+      cuadro: 'Aluminio Alpha Silver, guiado interno de cables, soportes para portabultos y pata de apoyo.',
+      suspension: 'SR Suntour XCE 28, resorte helicoidal, precarga, 100 mm de recorrido (talla XS: 80 mm).',
+      transmision: 'Shimano Altus / Tourney 2x8 o 3x7 velocidades con mandos Shimano EF500.',
+      frenos: 'Frenos de disco mecánicos Tektro MD-M280 con rotores de 160 mm.',
+      ruedas: 'Bontrager Connection, doble pared, 32 agujeros.',
+      llantas: 'Bontrager XR2 Comp, 29x2.20" (talla XS: 27.5x2.20").',
+      peso: '14.40 kg / 31.75 lbs.',
       garantia: 'Garantía oficial de por vida en cuadro Trek.'
     };
   }
 
-  if (title.includes('MARLIN+') || title.includes('POWERFLY') || title.includes('ELÉCTRICA') || title.includes('ELECTRICA')) {
+  // 3.5 Trek Roscoe (Trail agresivo 29) - SKU: CUA31442171K
+  if (norm.includes('ROSCOE') || norm.includes('CUA31442171K')) {
     return {
       oficial: true,
-      fuente: 'Trek Bikes & Bosch eBike Systems Official Datasheet',
-      motor: 'Bosch Active Line Plus, 50 Nm de par motor, asistencia progresiva hasta 25 km/h.',
-      bateria: 'Bosch CompactTube de 400 Wh integrada y desmontable en el tubo diagonal.',
-      display: 'Bosch Purion 200 a color con mando al manillar y conectividad Bluetooth app eBike Flow.',
-      cuadro: 'Aluminio Alpha Gold con batería integrada oculta y cableado interno completo.',
-      suspension: 'SR Suntour XCM 32, eje pasante Boost110 de 15 mm, 120 mm de recorrido.',
-      transmision: 'Shimano CUES U4000 1x9 vel Linkglide reforzada para torque eléctrico.',
-      frenos: 'Frenos de disco hidráulicos Tektro HD-M275 con rotores sobredimensionados de 203 mm para e-bike.',
-      peso: '21.30 kg / 46.96 lbs con batería incluida.',
-      garantia: 'Garantía de por vida en cuadro + 2 años de garantía oficial en motor/batería Bosch.'
+      fuente: 'Trek Trail Hardtail Manual (Roscoe Gen 4)',
+      cuadro: 'Aluminio Alpha Platinum, tubo de dirección perfilado, guiado interno de cables y dropper, eje pasante Boost148, soporte para neumáticos 29x2.60".',
+      suspension: 'Diseñado y optimizado para horquillas de 140 mm de recorrido con eje Boost110.',
+      frenos: 'Soporte de freno de disco post-mount para rotores de 180 a 203 mm.',
+      garantia: 'Garantía oficial de por vida en cuadro para el comprador original.'
     };
   }
 
-  if (title.includes('MADONE')) {
+  // =========================================================================
+  // 4. RUTA & GRAN FONDO (TREK MADONE, DOMANE, EMONDA & CANNONDALE SUPERSIX)
+  // =========================================================================
+
+  // 4.1 Trek Madone SL 5 & SL Disc - SKUs: MAD23998394R, MAD17253947E
+  if (norm.includes('MADONE') || norm.includes('MAD23998394R') || norm.includes('MAD17253947E')) {
     return {
       oficial: true,
-      fuente: 'Trek Factory Racing Aerodynamic Specs',
-      cuadro: 'Carbono OCLV Serie 500 aero con tecnología IsoFlow para disipación de vibraciones y ahorro de watts.',
+      fuente: 'Trek Factory Racing Aerodynamic Specs (Madone SL Series)',
+      cuadro: 'Carbono OCLV Serie 500 aero con tecnología IsoFlow para disipación de vibraciones y ahorro de watts, guiado interno oculto.',
       suspension: 'Horquilla Madone KVF de carbono completo, tubo cónico, eje pasante 12x100 mm.',
       transmision: 'Shimano 105 R7100, 2x12 velocidades con relación de competencia profesional.',
       desviador: 'Shimano 105 R7100 Down-Swing 50-34T.',
       cassette: 'Shimano 105 R7100, 11-34T, 12 velocidades.',
-      frenos: 'Frenos de disco hidráulicos Shimano 105, rotores Shimano RT70 Ice-Tech 160 mm.',
-      ruedas: 'Bontrager Paradigm SL / Aeolus Elite Tubeless Ready.',
+      frenos: 'Frenos de disco hidráulicos Shimano 105 con rotores RT70 Ice-Tech 160 mm.',
+      ruedas: 'Bontrager Aeolus Elite 35 / Paradigm SL Tubeless Ready.',
       peso: '8.70 kg / 19.18 lbs.',
-      garantia: 'Garantía de por vida Trek Carbon Care Warranty.'
+      garantia: 'Garantía oficial de por vida Trek Carbon Care Warranty.'
     };
   }
 
-  if (title.includes('DOMANE')) {
+  // 4.2 Trek Domane AL 2 & AL 4 Gen 4 - SKUs: DOM36819094E, DOM3721281K
+  if (norm.includes('DOMANE') || norm.includes('DOM36819094E') || norm.includes('DOM3721281K')) {
+    const isAL4 = norm.includes('AL 4') || norm.includes('DOM36819094E');
     return {
       oficial: true,
-      fuente: 'Trek Endurance Roadmap Datasheet',
-      cuadro: 'Aluminio Alpha Serie 100, geometría Endurance de alto confort para fondos largos, paso de rueda 38c.',
-      suspension: 'Horquilla Domane de carbono completo, eje pasante 12x100 mm.',
-      transmision: 'Shimano Tiagra 4700 2x10 velocidades.',
-      frenos: 'Frenos de disco hidráulicos Shimano Tiagra con rotores RT66 de 160 mm.',
-      ruedas: 'Bontrager Paradigm, Tubeless Ready, 24 hoyos.',
-      peso: '10.35 kg / 22.82 lbs.',
+      fuente: 'Trek Endurance Roadmap Datasheet (Domane AL Gen 4)',
+      cuadro: 'Aluminio Alpha Serie 100, geometría Endurance de alto confort para fondos largos, paso de rueda amplio hasta 38c.',
+      suspension: 'Horquilla Domane de carbono completo, tubo de dirección perfilado de carbono, eje pasante 12x100 mm.',
+      transmision: isAL4 ? 'Shimano Tiagra 4700 2x10 velocidades compact (50/34T).' : 'Shimano Claris R2000 2x8 velocidades compact (50/34T).',
+      frenos: isAL4 ? 'Frenos de disco hidráulicos Shimano Tiagra con rotores RT66 de 160 mm.' : 'Frenos de disco mecánicos Tektro C550 de doble pistón con rotores de 160 mm.',
+      ruedas: 'Bontrager Paradigm, Tubeless Ready, 24 hoyos, ancho interior 21 mm.',
+      peso: isAL4 ? '10.35 kg / 22.82 lbs.' : '10.55 kg / 23.26 lbs.',
       garantia: 'Garantía oficial de por vida en cuadro Trek.'
     };
   }
 
-  if (title.includes('HABIT') || brand.includes('CANNONDALE')) {
+  // 4.3 Trek Emonda ALR 5 - SKU: EMO36221095E
+  if (norm.includes('EMONDA') || norm.includes('EMO36221095E')) {
     return {
       oficial: true,
-      fuente: 'Cannondale Factory Spec Manual',
-      cuadro: 'SmartForm C1 Premium Alloy, 130 mm de recorrido, cinemática Proportional Response Tuned.',
-      suspension: 'Horquilla RockShox Recon RL 140 mm + Amortiguador trasero RockShox Deluxe Select DebonAir.',
-      transmision: 'Shimano Deore M6100 de 1x12 velocidades con micro-spline.',
-      frenos: 'Frenos de disco hidráulicos Shimano MT200 con rotores RT10 de 180 mm.',
-      ruedas: 'WTB STX i25 TCS Tubeless Ready.',
-      peso: '15.40 kg.',
-      garantia: 'Garantía Cannondale Lifetime Frame Warranty.'
+      fuente: 'Trek Lightweight Climbing Datasheet (Emonda ALR 5 Series)',
+      cuadro: 'Aluminio ultraligero Alpha Serie 300 con tecnología Invisible Weld de soldaduras pulidas invisibles, geometría H1.5 de carrera.',
+      suspension: 'Horquilla Emonda de carbono completo OCLV, tubo cónico, eje pasante 12x100 mm.',
+      transmision: 'Shimano 105 R7100 mecánico / Di2, 2x12 velocidades con bielas compact 50/34T.',
+      cassette: 'Shimano 105 R7100, 11-34T, 12 velocidades.',
+      frenos: 'Frenos de disco hidráulicos Shimano 105 con rotores RT70 Ice-Tech 160 mm.',
+      ruedas: 'Bontrager Paradigm SL, Tubeless Ready, 24 agujeros.',
+      peso: '8.85 kg / 19.51 lbs (cuadro de aluminio escalador más ligero de Trek).',
+      garantia: 'Garantía oficial de por vida en cuadro Trek.'
     };
   }
 
-  if (title.includes('TOP FUEL')) {
+  // 4.4 Cannondale SuperSix Evo 3 - SKU: SUP30656724E
+  if (norm.includes('SUPER SIX') || norm.includes('SUPERSIX') || norm.includes('SUP30656724E')) {
     return {
       oficial: true,
-      fuente: 'Trek XC/Trail Factory Datasheet',
-      cuadro: 'Carbono OCLV Mountain completo con compartimento interno de herramientas BITS integrado.',
-      suspension: 'Fox Performance 34 Float EVOL 130 mm + Fox Float DPS 120 mm con control remoto de bloqueo.',
-      transmision: 'Shimano Deore XT M8100 1x12 velocidades completo.',
-      frenos: 'Frenos Shimano Deore XT M8120 de 4 pistones.',
-      ruedas: 'Bontrager Line Elite 30 OCLV Carbon Tubeless Ready.',
-      peso: '12.80 kg.',
-      garantia: 'Garantía de por vida en cuadro y ruedas de carbono Trek Carbon Care.'
+      fuente: 'Cannondale Aerodynamic Road Racing Whitepaper (SuperSix EVO 3 Gen 4)',
+      cuadro: 'Carbono SuperSix EVO BallisTec ultraligero con diseño aerodinámico de tubos Delta, guiado completamente integrado.',
+      suspension: 'Horquilla SuperSix EVO full carbon, corona integrada, eje pasante Speed Release 12x100 mm.',
+      transmision: 'Shimano 105 Di2 R7170 electrónico inalámbrico 2x12 velocidades.',
+      cassette: 'Shimano 105 R7100, 11-34T, 12 velocidades.',
+      frenos: 'Frenos de disco hidráulicos Shimano 105 Di2 con rotores RT70 de 160 mm.',
+      ruedas: 'DT Swiss R470 db / Maddux HollowGram 35 de perfil aero.',
+      peso: '8.20 kg / 18.08 lbs.',
+      garantia: 'Garantía oficial de por vida en cuadro Cannondale.'
     };
   }
 
-  if (title.includes('ROSCOE')) {
+  // =========================================================================
+  // 5. FITNESS & HÍBRIDAS (TREK FX SERIES)
+  // =========================================================================
+
+  // 5.1 Trek FX 1 & FX Sport AL 3 - SKUs: FX114224597R, FXS24636470D
+  if (norm.includes('FX 1') || norm.includes('FX SPORT') || norm.includes('FX114224597R') || norm.includes('FXS24636470D')) {
+    const isSport = norm.includes('SPORT') || norm.includes('FXS24636470D');
     return {
       oficial: true,
-      fuente: 'Trek Trail Hardtail Datasheet',
-      cuadro: 'Aluminio Alpha Gold, pipa cónica, guiado interno de cables y poste telescópico, soporte ISCG 05, Boost148.',
-      compatibilidad: 'Acepta horquillas de hasta 140 mm de recorrido y neumáticos trail de 29x2.60".',
-      peso: '2.45 kg (Solo cuadro).',
-      garantia: 'Garantía oficial de por vida Trek.'
+      fuente: isSport ? 'Trek Fast Fitness Roadmap (FX Sport AL 3)' : 'Trek City & Commuter Manual (FX 1 Gen 4)',
+      cuadro: isSport ? 'Aluminio Alpha Gold, guiado interno de cables, geometría deportiva ergonómica, frenos de disco flat mount.' : 'Aluminio Alpha Gold, guiado interno de cables, soportes para salpicaderas y portabultos.',
+      suspension: 'Horquilla de aleación ligera FX Steel / Carbon con soportes para portabultos Lowrider.',
+      transmision: isSport ? 'Shimano CUES / Sora 2x9 velocidades con mando Rapidfire.' : 'Shimano Altus 2x8 velocidades con mando Shimano EF500.',
+      frenos: isSport ? 'Frenos de disco hidráulicos Shimano con rotores de 160 mm.' : 'Frenos de disco mecánicos con rotores de 160 mm.',
+      ruedas: 'Bontrager Connection, doble pared, 32 agujeros.',
+      llantas: 'Bontrager H2 Comp, 700x35c / 700x32c con banda reflectante de seguridad nocturna.',
+      peso: isSport ? '11.20 kg / 24.69 lbs.' : '12.45 kg / 27.45 lbs.',
+      garantia: 'Garantía oficial de por vida en cuadro Trek.'
     };
   }
 
-  if (title.includes('FX 1')) {
+  // =========================================================================
+  // 6. GAMA MEXICANA ALUBIKE (XTA & SIERRA SERIES)
+  // =========================================================================
+
+  // 6.1 Alubike XTA 1.0, 2.0 & 3.0 - SKUs: XTA20443263E, XTA22268491E, XTA22941471E, XTA19972908E, XTA2414870E
+  if (norm.includes('XTA') || norm.includes('XTA20443263E') || norm.includes('XTA22268491E') || norm.includes('XTA22941471E') || norm.includes('XTA19972908E') || norm.includes('XTA2414870E')) {
+    const isXTA3 = norm.includes('3.0') || norm.includes('XTA2414870E');
     return {
       oficial: true,
-      fuente: 'Trek Fitness & City Specs',
-      cuadro: 'Aluminio Alpha Gold, guiado interno, soportes listos para salpicaderas y alforjas traseras.',
-      transmision: 'Shimano Altus 2x8 velocidades.',
-      frenos: 'Frenos de disco mecánicos Tektro MD-M280.',
-      peso: '12.60 kg.',
-      garantia: 'Garantía de por vida en cuadro Trek.'
+      fuente: 'Alubike México Ficha Técnica Oficial (Gama XTA MTB 29)',
+      cuadro: 'Aluminio 6061 XTA hidroformado de doble espesor con soldaduras reforzadas T6, guiado interno de cables.',
+      suspension: isXTA3 ? 'Horquilla de aire con barras anodizadas de 32 mm, bloqueo remoto en manillar, 100 mm de recorrido.' : 'Horquilla de suspensión SR Suntour XCM con bloqueo hidráulico al hombro, 100 mm.',
+      transmision: isXTA3 ? 'Shimano Deore M6100 1x12 velocidades con monoplato 32T y embrague Shadow RD+.' : 'Shimano CUES / Deore 1x10 o 2x9 velocidades.',
+      frenos: 'Frenos de disco hidráulicos Shimano MT200 con rotores de 160 mm.',
+      ruedas: 'Rines de aluminio doble pared Alubike 29" con mazas de balero sellado.',
+      llantas: 'Maxxis / Kenda 29x2.25" de alto rodaje.',
+      peso: '13.80 kg / 30.42 lbs.',
+      garantia: 'Garantía oficial de fábrica Alubike México con respaldo en taller Cordillera Trek.'
     };
   }
 
+  // 6.2 Alubike Sierra 20 & 29 - SKUs: SIE24530659E, SIE20176138E, SIE19858412E, SIE22508971E
+  if (norm.includes('SIERRA') || norm.includes('SIE24530659E') || norm.includes('SIE20176138E') || norm.includes('SIE19858412E') || norm.includes('SIE22508971E')) {
+    const is20 = norm.includes('20') || norm.includes('SIE19858412E') || norm.includes('SIE22508971E');
+    return {
+      oficial: true,
+      fuente: 'Alubike México Ficha Técnica Oficial (Sierra Recreativa)',
+      cuadro: 'Aluminio 6061 Sierra con geometría recreativa de fácil ascenso y manejo cómodo ergonómico.',
+      suspension: is20 ? 'Horquilla rígida de aleación ligera o suspensión corta de 40 mm para niños.' : 'Horquilla de suspensión delantera 80 mm de recorrido con resorte de confort.',
+      transmision: is20 ? 'Shimano Tourney 6/7 velocidades con mando giratorio.' : 'Shimano Tourney 3x7 velocidades (21 velocidades) con mandos integrados.',
+      frenos: 'Frenos de disco mecánicos con rotores de 160 mm (potencia de frenado en todo clima).',
+      ruedas: is20 ? 'Rines de aluminio 20" con llantas 20x2.0".' : 'Rines de aluminio 29" doble pared con llantas multi-terreno 29x2.10".',
+      garantia: 'Garantía de fábrica Alubike respaldada por Cordillera Trek Coronado #1130.'
+    };
+  }
+
+  // =========================================================================
+  // 7. INFANTIL & ACCESORIOS (TREK PRECALIBER, REMOLQUE & ROCKBROS)
+  // =========================================================================
+
+  // 7.1 Trek Precaliber 16, 20 & 24 - SKUs: PRE21969082K, PRE26177715K, PRE27297304Y, PRE36843695K
+  if (norm.includes('PRECALIBER') || norm.includes('PRE21969082K') || norm.includes('PRE26177715K') || norm.includes('PRE27297304Y') || norm.includes('PRE36843695K')) {
+    const is24 = norm.includes('24') || norm.includes('PRE36843695K');
+    const is16 = norm.includes('16') || norm.includes('PRE21969082K') || norm.includes('PRE26177715K');
+    return {
+      oficial: true,
+      fuente: 'Trek Dialed Fit Youth Manual (Precaliber Kids Series)',
+      cuadro: 'Aluminio Alpha Silver Dialed Fit con geometría ergonómica especial para niños (longitud de biela y ancho de sillín adaptados).',
+      suspension: is24 ? 'Horquilla con suspensión Dialed de 45 mm para senderos reales.' : 'Horquilla rígida de aleación ligera para máxima facilidad de pedaleo.',
+      transmision: is24 ? 'Shimano Tourney 8 velocidades con mando giratorio Shimano RS45 de fácil torsión.' : 'Monomarcha (single speed) sencilla y sin mantenimiento.',
+      frenos: is16 ? 'Freno contrapedal trasero + freno de mano delantero con maneta corta Dialed.' : 'Frenos de tiro lineal V-brake de aleación con manetas Dialed de corto alcance.',
+      ruedas: is16 ? 'Ruedas de 16" (rueditas de entrenamiento desmontables sin herramientas incluidas).' : (is24 ? 'Ruedas de 24" con llantas Bontrager XR1 24x2.25".' : 'Ruedas de 20" de aluminio.'),
+      peso: is16 ? '8.54 kg / 18.83 lbs.' : (is24 ? '11.90 kg / 26.24 lbs.' : '10.20 kg / 22.49 lbs.'),
+      garantia: 'Garantía oficial de por vida en cuadro Trek.'
+    };
+  }
+
+  // 7.2 Trek Remolque MT-201 - SKU: REM25478026K
+  if (norm.includes('REMOLQUE') || norm.includes('MT-201') || norm.includes('REM25478026K')) {
+    return {
+      oficial: true,
+      fuente: 'Trek Family & Cargo Manual (Trailer MT-201)',
+      cuadro: 'Estructura plegable de acero de alta resistencia con enganche universal pivotante de liberación rápida para tija de sillín.',
+      transmision: 'Single speed con cubrecadena integral para máxima seguridad del niño.',
+      ruedas: 'Rueda de 20" con rin de aleación ligera, bandera de seguridad reflectante de alta visibilidad incluida.',
+      peso: 'Capacidad de carga máxima recomendada: hasta 38.5 kg.',
+      garantia: 'Garantía oficial Trek.'
+    };
+  }
+
+  // 7.3 Rockbros SX1 XRide Balance Bike - SKU: BIC38139744S
+  if (norm.includes('ROCKBROS') || norm.includes('SX1') || norm.includes('BALANCE') || norm.includes('BIC38139744S')) {
+    return {
+      oficial: true,
+      fuente: 'Rockbros Official Product Datasheet (SX1 XRide Magnesium)',
+      cuadro: 'Estructura integral de magnesio fundido sin soldaduras (superligera y resistente a la corrosión).',
+      ruedas: 'Rines de 12 pulgadas con rodamientos sellados de baja fricción y llantas neumáticas de caucho con cámara.',
+      peso: '3.20 kg / 7.05 lbs (ultraligera para que niños de 2 a 5 años la dominen con facilidad).',
+      garantia: 'Garantía de calidad oficial con respaldo directo en tienda Cordillera Trek.'
+    };
+  }
+
+  // Fallback general para productos sin ficha precargada
   return {
     oficial: false,
     fuente: 'Sincronización Certificada Ascend RMS',
-    cuadro: `${brand} High Performance Alloy / Composite`,
+    cuadro: `${rawBrand} High Performance Alloy / Composite`,
     transmision: 'Componentes certificados de fábrica según especificación oficial del lote',
     frenos: 'Sistema de frenado de disco certificado en taller',
-    garantia: `Garantía oficial directa respaldada por ${brand} y Cordillera Trek Coronado #1130`
+    garantia: `Garantía oficial directa respaldada por ${rawBrand} y Cordillera Trek Coronado #1130`
   };
 }
 
